@@ -68,8 +68,7 @@ void logMessage(const char* format, ...);
     // Send a test notification after a short delay to register with macOS
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                   dispatch_get_main_queue(), ^{
-        NSString *statusMessage = _isMonitoringEnabled ? @"Monitoring keyboard input for excessive typing" : @"Keyboard monitoring is disabled";
-        Notify(@"Keyboard Monitor Active", statusMessage, YES); // Enable sound to make it more noticeable
+        // Notify(@"Keyboard Monitor Active", statusMessage, YES); // Enable sound to make it more noticeable
     });
 
     logMessage("Application initialization complete");
