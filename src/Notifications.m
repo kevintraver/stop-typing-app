@@ -192,7 +192,18 @@ void NotificationsRequestAuthorization(void) {
     }];
 }
 
-void Notify(NSString *title, NSString *message, BOOL playSound) {
+static NSURL *BundleURLForImageNamed(NSString *name) {
+    if (name.length == 0) return nil;
+    NSArray<NSString *> *exts = @[ @"png", @"jpg", @"jpeg", @"gif" ];
+    NSBundle *bundle = [NSBundle mainBundle];
+    for (NSString *ext in exts) {
+        NSURL *url = [bundle URLForResource:name withExtension:ext];
+        if (url) return url;
+    }
+    return nil;
+}
+
+void NotifyWithIcon(NSString *title, NSString *message, BOOL playSound, NSString *iconNameOrNil) {
     if (!RunningInAppBundle()) {
         // Silently skip notifications when not running from an .app bundle
         NSLog(@"Notify: skipping - not in app bundle");
@@ -209,10 +220,24 @@ void Notify(NSString *title, NSString *message, BOOL playSound) {
     content.title = title ?: @"";
     content.body = message ?: @"";
 
-    // Do not attach the app icon. The system automatically
-    // displays the delivering app's icon on the left of the banner.
-    // Adding an attachment is unnecessary here and .icns is not a
-    // supported attachment type for UNNotificationAttachment.
+    // Optionally attach a custom image from bundle (png/jpg/jpeg/gif only)
+    if (iconNameOrNil.length > 0) {
+        NSURL *imgURL = BundleURLForImageNamed(iconNameOrNil);
+        if (imgURL) {
+            NSError *attErr = nil;
+            UNNotificationAttachment *att = [UNNotificationAttachment attachmentWithIdentifier:@"image"
+                                                                                           URL:imgURL
+                                                                                       options:nil
+                                                                                         error:&attErr];
+            if (att) {
+                content.attachments = @[ att ];
+            } else if (attErr) {
+                NSLog(@"Notify: failed to attach image '%@': %@", iconNameOrNil, attErr);
+            }
+        } else {
+            NSLog(@"Notify: image '%@' not found in bundle (tried png/jpg/jpeg/gif)", iconNameOrNil);
+        }
+    }
 
     // Set sound
     if (playSound) {
@@ -241,4 +266,9 @@ void Notify(NSString *title, NSString *message, BOOL playSound) {
             NSLog(@"Notify: notification sent successfully - %@", title);
         }
     }];
+}
+
+void Notify(NSString *title, NSString *message, BOOL playSound) {
+    // Backward-compatible entrypoint without icon
+    NotifyWithIcon(title, message, playSound, nil);
 }

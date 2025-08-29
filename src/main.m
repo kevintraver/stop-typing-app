@@ -96,9 +96,9 @@ void logMessage(const char* format, ...) {
 
 // Show a notification using modern UserNotifications framework
 void showNotification(NSString *title, NSString *message, BOOL playSound) {
-    // Use the modern Notify function from Notifications.h
-    Notify(title, message, playSound);
-    logMessage("Notification delivered via UserNotifications framework");
+    // Prefer attaching a custom icon if available
+    NotifyWithIcon(title, message, playSound, @"keyboard-off");
+    logMessage("Notification delivered via UserNotifications framework (icon: keyboard-off)");
 }
 
 // Reset all tracking state

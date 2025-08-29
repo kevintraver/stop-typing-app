@@ -14,7 +14,13 @@ all: app
 
 app: $(APP_DIR)
 
+
 $(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist $(RESOURCES_DIR)/StopTyping.icns
+	# Optionally include a custom notification image if present
+	@if [ -f keyboard-off.png ]; then \
+	  cp keyboard-off.png $(RESOURCES_DIR)/keyboard-off.png; \
+	  echo "Copied keyboard-off.png into app bundle Resources"; \
+	fi
 	codesign --entitlements StopTyping.entitlements --force --sign - $(APP_DIR)
 	@echo "Application bundle created and signed at $(APP_DIR)"
 
