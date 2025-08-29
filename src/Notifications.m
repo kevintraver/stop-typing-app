@@ -1,6 +1,7 @@
 #import "Notifications.h"
 #import <UserNotifications/UserNotifications.h>
 #import <Cocoa/Cocoa.h>
+#import "SVGRenderer.h"
 
 @interface NotificationsDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
@@ -235,7 +236,26 @@ void NotifyWithIcon(NSString *title, NSString *message, BOOL playSound, NSString
                 NSLog(@"Notify: failed to attach image '%@': %@", iconNameOrNil, attErr);
             }
         } else {
-            NSLog(@"Notify: image '%@' not found in bundle (tried png/jpg/jpeg/gif)", iconNameOrNil);
+            // Fallback: if requesting keyboard-off, generate from built-in SVG at runtime
+            if ([iconNameOrNil isEqualToString:@"keyboard-off"]) {
+                NSURL *generated = EnsureKeyboardOffPNG();
+                if (generated) {
+                    NSError *attErr = nil;
+                    UNNotificationAttachment *att = [UNNotificationAttachment attachmentWithIdentifier:@"image"
+                                                                                                   URL:generated
+                                                                                               options:nil
+                                                                                                 error:&attErr];
+                    if (att) {
+                        content.attachments = @[ att ];
+                    } else if (attErr) {
+                        NSLog(@"Notify: failed to attach generated keyboard-off PNG: %@", attErr);
+                    }
+                } else {
+                    NSLog(@"Notify: image '%@' not found in bundle and generation failed", iconNameOrNil);
+                }
+            } else {
+                NSLog(@"Notify: image '%@' not found in bundle (tried png/jpg/jpeg/gif)", iconNameOrNil);
+            }
         }
     }
 

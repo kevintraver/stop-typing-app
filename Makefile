@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -Wall -g -fobjc-arc -framework Foundation -framework Cocoa -framework Carbon -framework UserNotifications
+CFLAGS = -Wall -g -fobjc-arc -framework Foundation -framework Cocoa -framework Carbon -framework UserNotifications -framework WebKit
 SRC_DIR = src
 BUILD_DIR = build
 APP_NAME = StopTyping
@@ -25,7 +25,7 @@ $(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist $(RESOURCES_DIR)/StopTyping.icn
 	@echo "Application bundle created and signed at $(APP_DIR)"
 
 
-SOURCES = $(SRC_DIR)/main.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.m $(SRC_DIR)/Notifications.m $(SRC_DIR)/Accessibility.m $(SRC_DIR)/PermissionsManager.m
+SOURCES = $(SRC_DIR)/main.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.m $(SRC_DIR)/Notifications.m $(SRC_DIR)/Accessibility.m $(SRC_DIR)/PermissionsManager.m $(SRC_DIR)/SVGRenderer.m
 
 $(TARGET): $(SOURCES) | $(MACOS_DIR)
 	$(CC) $(CFLAGS) $^ -o $@
