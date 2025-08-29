@@ -1,28 +1,42 @@
-#import "Accessibility.h"
-#import <ApplicationServices/ApplicationServices.h>
-#import <Cocoa/Cocoa.h>
+ #import "Accessibility.h"
+ #import <ApplicationServices/ApplicationServices.h>
+ #import <Cocoa/Cocoa.h>
 
-BOOL EnsureAccessibilityTrust(void) {
-    NSDictionary *options = @{(__bridge NSString*)kAXTrustedCheckOptionPrompt: @YES};
-    Boolean trusted = AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+ static BOOL gPromptedForAX = NO;
+ static BOOL gGuidanceShown = NO;
 
-    if (!trusted) {
-        // Optionally, guide the user to the right Settings pane
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSAlert *alert = [[NSAlert alloc] init];
-            alert.alertStyle = NSAlertStyleWarning;
-            alert.messageText = @"Accessibility Permission Required";
-            alert.informativeText = @"To monitor keyboard input, enable Accessibility for Keyboard Monitor in System Settings → Privacy & Security → Accessibility. Click Open Settings, then add and enable the app.";
-            [alert addButtonWithTitle:@"Open Settings"];
-            [alert addButtonWithTitle:@"Later"];
-            NSModalResponse response = [alert runModal];
-            if (response == NSAlertFirstButtonReturn) {
-                NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
-                [[NSWorkspace sharedWorkspace] openURL:url];
-            }
-        });
-    }
+ BOOL AXTrusted(void) {
+     return AXIsProcessTrusted();
+ }
 
-    return (BOOL)trusted;
-}
+ BOOL EnsureAccessibilityTrust(void) {
+     if (AXIsProcessTrusted()) {
+         return YES;
+     }
 
+     if (!gPromptedForAX) {
+         gPromptedForAX = YES;
+         NSDictionary *options = @{(__bridge NSString*)kAXTrustedCheckOptionPrompt: @YES};
+         (void)AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
+
+         // After prompting, wait briefly; only show guidance if still not trusted
+         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+             if (!AXIsProcessTrusted() && !gGuidanceShown) {
+                 gGuidanceShown = YES;
+                 NSAlert *alert = [[NSAlert alloc] init];
+                 alert.alertStyle = NSAlertStyleWarning;
+                 alert.messageText = @"Accessibility Permission Required";
+                 alert.informativeText = @"Enable Accessibility for Keyboard Monitor in System Settings → Privacy & Security → Accessibility. After enabling, return to the app; it will start automatically.";
+                 [alert addButtonWithTitle:@"Open Settings"];
+                 [alert addButtonWithTitle:@"Later"];
+                 NSModalResponse response = [alert runModal];
+                 if (response == NSAlertFirstButtonReturn) {
+                     NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+                     [[NSWorkspace sharedWorkspace] openURL:url];
+                 }
+             }
+         });
+     }
+
+     return NO;
+ }

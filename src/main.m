@@ -2,6 +2,9 @@
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
 #import <ApplicationServices/ApplicationServices.h>
+#import <UserNotifications/UserNotifications.h>
+#import "PermissionsManager.h"
+#import "Notifications.h"
 
 // Global file handle for logging
 FILE *logFile = NULL;
@@ -10,125 +13,40 @@ FILE *logFile = NULL;
 void logMessage(const char* format, ...);
 void showNotification(NSString *title, NSString *message, BOOL playSound);
 
-// Disable deprecation warnings for NSUserNotification APIs
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
-// Define notification delegate
-@interface NotificationDelegate : NSObject <NSUserNotificationCenterDelegate>
+// Modern notification delegate using UserNotifications framework
+@interface NotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
 
 @implementation NotificationDelegate
-- (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center 
-    shouldPresentNotification:(NSUserNotification *)notification {
-    // Always show notifications, even when app is in foreground
-    return YES;
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler {
+    // Show notifications even when app is in foreground
+    completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionSound);
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void(^)(void))completionHandler {
+    completionHandler();
 }
 @end
-#pragma clang diagnostic pop
 
-// Application delegate to handle menu bar and app lifecycle
-@interface AppDelegate : NSObject <NSApplicationDelegate>
-{
-    NSStatusItem *statusItem;
-    NotificationDelegate *retainedNotificationDelegate; // Keep a strong reference
-}
-- (void)setupStatusItem;
-- (void)quit:(id)sender;
-@end
-
-@implementation AppDelegate
-
-- (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    logMessage("AppDelegate: applicationDidFinishLaunching called");
-    
-    // Set up the status bar item
-    [self setupStatusItem];
-    
-    // Set up NSUserNotificationCenter with retained delegate
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    retainedNotificationDelegate = [[NotificationDelegate alloc] init];
-    NSUserNotificationCenter *center = [NSUserNotificationCenter defaultUserNotificationCenter];
-    [center setDelegate:retainedNotificationDelegate];
-    #pragma clang diagnostic pop
-    
-    // Send a test notification after a short delay
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), 
-                  dispatch_get_main_queue(), ^{
-        showNotification(@"Keyboard Monitor Active", 
-                     @"Monitoring keyboard input for excessive typing", 
-                     NO);
-    });
-    
-    logMessage("Application initialization complete");
-}
-
-- (void)setupStatusItem {
-    logMessage("Setting up status bar item with text title only");
-    
-    // Create the status item with variable length for text
-    statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    
-    if (!statusItem) {
-        logMessage("ERROR: Failed to create status item!");
-        return;
-    }
-    
-    // Create menu for the status item
-    NSMenu *menu = [[NSMenu alloc] init];
-    [menu addItemWithTitle:@"Keyboard Monitor" action:nil keyEquivalent:@""];
-    [menu addItem:[NSMenuItem separatorItem]];
-    [menu addItemWithTitle:@"Quit" action:@selector(quit:) keyEquivalent:@"q"];
-    
-    // Set the menu
-    [statusItem setMenu:menu];
-    
-    // Try simple text title "KM" instead of emoji - using both modern and legacy methods
-    NSString *plainTitle = @"KM";
-    
-    if (statusItem.button) {
-        // Modern approach (macOS 10.14+)
-        logMessage("Using modern button API for title");
-        statusItem.button.title = plainTitle;
-        
-        // Make sure it's properly styled
-        statusItem.button.font = [NSFont boldSystemFontOfSize:12.0];
-    }
-    
-    // Also use the legacy approach as backup
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [statusItem setTitle:plainTitle];
-    #pragma clang diagnostic pop
-    
-    logMessage("Status bar item configured with plain text title '%s'", [plainTitle UTF8String]);
-}
-
-- (void)quit:(id)sender {
-    logMessage("Quit menu item selected");
-    
-    // Explicitly remove status item before quitting
-    if (statusItem) {
-        [[NSStatusBar systemStatusBar] removeStatusItem:statusItem];
-        statusItem = nil;
-    }
-    
-    [NSApp terminate:self];
-}
-
-@end
+// Import the AppDelegate from AppDelegate.h
+#import "AppDelegate.h"
 
 // Typing monitoring settings
 const int MAX_CONSECUTIVE_CHARS = 15;     // Warning after 15 consecutive characters
 const int TYPING_COOLDOWN_MS = 3000;      // 3 seconds debounce period
 BOOL showDebounceInfo = YES;              // Show detailed timing information
 
-// Global tracking state
+// Global tracking state (used by event callback)
 NSMutableString *recentChars;             // Buffer of recent characters
 NSDate *lastKeyPressTime;                 // Last keypress timestamp
 BOOL warningDisplayed = NO;               // Flag to prevent multiple warnings
 int consecutiveChars = 0;                 // Count of consecutive characters typed
+
+// Global file handle for logging (used by AppDelegate) - declared at top of file
 
 // Function to get current time formatted as a string
 NSString* getCurrentTimeString() {
@@ -165,54 +83,11 @@ void logMessage(const char* format, ...) {
     va_end(args_copy);
 }
 
-// Show a notification using classic NSUserNotification
+// Show a notification using modern UserNotifications framework
 void showNotification(NSString *title, NSString *message, BOOL playSound) {
-    @autoreleasepool {
-        // Disable deprecation warnings for NSUserNotification APIs
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        
-        // Create notification
-        NSUserNotification *notification = [[NSUserNotification alloc] init];
-        notification.title = title;
-        notification.informativeText = message;
-        
-        // Add sound if requested
-        if (playSound) {
-            notification.soundName = NSUserNotificationDefaultSoundName;
-        } else {
-            notification.soundName = nil; // No sound
-        }
-        
-        // Add a timestamp
-        notification.deliveryDate = [NSDate date];
-        
-        // Set a unique identifier
-        notification.identifier = [NSString stringWithFormat:@"KeyboardMonitor-%lld", 
-                                 (long long)[[NSDate date] timeIntervalSince1970]];
-        
-        // Try both notification methods
-        NSUserNotificationCenter *center = [NSUserNotificationCenter defaultUserNotificationCenter];
-        [center deliverNotification:notification];
-        
-        // Also immediately schedule it
-        [center scheduleNotification:notification];
-        
-        #pragma clang diagnostic pop
-        
-        logMessage("Notification delivered to NSUserNotificationCenter");
-        
-        // For extremely robust notification, also try AppleScript as fallback
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSString *escapedMessage = [message stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
-            NSString *escapedTitle = [title stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
-            NSString *scriptCommand = [NSString stringWithFormat:
-                @"/usr/bin/osascript -e 'display notification \"%@\" with title \"%@\" without sound'",
-                escapedMessage, escapedTitle];
-            
-            system([scriptCommand UTF8String]);
-        });
-    }
+    // Use the modern Notify function from Notifications.h
+    Notify(title, message, playSound);
+    logMessage("Notification delivered via UserNotifications framework");
 }
 
 // Reset all tracking state
@@ -414,22 +289,22 @@ int main(int argc, const char * argv[]) {
         // ---- STEP 1: Initialize logging ----
         NSString *logPath = [NSString stringWithFormat:@"%@/keylog.txt", NSHomeDirectory()];
         logFile = fopen([logPath UTF8String], "a");
-        
+
         if (!logFile) {
             NSLog(@"Failed to open log file at %@", logPath);
             printf("Failed to open log file at %s\n", [logPath UTF8String]);
             return 1;
         }
-        
+
         logMessage("==============================================");
         logMessage("                 KEYBOARD MONITOR");
         logMessage("==============================================");
         logMessage("App starting up...");
-        
+
         // ---- STEP 2: Initialize application ----
         logMessage("Creating NSApplication instance");
         [NSApplication sharedApplication];
-        
+
         // For menu bar apps, we need to transform the process
         // This is an essential step for menu bar apps on modern macOS
         logMessage("Transforming to UI Element Application (critical for menu bar)");
@@ -438,16 +313,33 @@ int main(int argc, const char * argv[]) {
         if (err != noErr) {
             logMessage("WARNING: Failed to transform process: Error %d", (int)err);
         }
-        
-        // Set activation policy EARLY - critical for menu bar apps
-        logMessage("Setting activation policy to Accessory (menu bar app)");
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-        
+
+        // Start as regular app for notification registration
+        logMessage("Setting activation policy to Regular (needed for notifications)");
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
         // ---- STEP 3: Set up app delegate ----
         logMessage("Creating and setting application delegate");
         AppDelegate *appDelegate = [[AppDelegate alloc] init];
         [NSApp setDelegate:appDelegate];
-        
+
+        // ---- STEP 3.5: Switch to accessory mode after initialization ----
+        logMessage("Will switch to accessory mode after notification setup");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            logMessage("Switching to accessory mode to hide from dock");
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        });
+
+        // ---- STEP 3.5: Create a hidden window to help with notification registration ----
+        logMessage("Creating hidden window for notification registration");
+        NSWindow *hiddenWindow = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1, 1)
+                                                             styleMask:NSWindowStyleMaskBorderless
+                                                               backing:NSBackingStoreBuffered
+                                                                 defer:NO];
+        [hiddenWindow setReleasedWhenClosed:NO];
+        [hiddenWindow orderOut:nil]; // Hide the window
+        logMessage("Hidden window created and hidden");
+
         // ---- STEP 4: Initialize tracking state ----
         logMessage("Initializing typing tracking state");
         recentChars = [[NSMutableString alloc] init];
@@ -462,9 +354,47 @@ int main(int argc, const char * argv[]) {
         logMessage("📝  LOG LOCATION: %s", [logPath UTF8String]);
         logMessage("==============================================");
         
-        // ---- STEP 5: Set up keyboard event monitoring ----
+        // ---- STEP 5: Ensure accessibility permissions ----
+        logMessage("Checking accessibility permissions...");
+
+        // Use the permissions manager to ensure accessibility is enabled
+        [[PermissionsManager shared] ensureAccessibilityPromptOnce];
+
+        // Wait a moment for the user to potentially grant permissions
+        [NSThread sleepForTimeInterval:1.0];
+
+        // Check if we have accessibility permissions
+        if (!AXIsProcessTrusted()) {
+            logMessage("ERROR: Accessibility permissions not granted");
+
+            // Show a helpful dialog to guide the user
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:@"Accessibility Permission Required"];
+                [alert setInformativeText:@"KeyboardMonitor needs accessibility permissions to monitor keyboard input.\n\n"
+                                           "Please enable accessibility permissions in System Settings → Privacy & Security → Accessibility, then restart the app."];
+                [alert setAlertStyle:NSAlertStyleWarning];
+
+                [alert addButtonWithTitle:@"Open Accessibility Settings"];
+                [alert addButtonWithTitle:@"Quit"];
+
+                NSModalResponse response = [alert runModal];
+
+                if (response == NSAlertFirstButtonReturn) {
+                    [[PermissionsManager shared] openAccessibilitySettings];
+                }
+            });
+
+            // Quit the app
+            fclose(logFile);
+            return 1;
+        }
+
+        logMessage("Accessibility permissions granted - setting up keyboard monitoring...");
+
+        // ---- STEP 6: Set up keyboard event monitoring ----
         logMessage("Setting up keyboard event monitoring...");
-        
+
         // Create an event tap to monitor keyboard events
         CFMachPortRef eventTap = CGEventTapCreate(
             kCGSessionEventTap,        // Tap at session level
@@ -474,42 +404,20 @@ int main(int argc, const char * argv[]) {
             eventCallback,             // Callback function
             NULL                       // User data
         );
-        
+
         if (!eventTap) {
-            logMessage("ERROR: Failed to create event tap - accessibility permissions required");
-            
-            // Show a helpful dialog to guide the user to enable accessibility permissions
-            NSAlert *alert = [[NSAlert alloc] init];
-            [alert setMessageText:@"Accessibility Permission Required"];
-            [alert setInformativeText:@"KeyboardMonitor needs accessibility permissions to monitor keyboard input.\n\n"
-                                      "1. Click 'Open Privacy Settings'\n"
-                                      "2. Click the lock icon and enter your password\n"
-                                      "3. Click the '+' button under the app list\n" 
-                                      "4. Navigate to this location and select the app:\n"
-                                      "   /Users/kevin/Code/macos_keylogger/build/KeyboardMonitor.app\n"
-                                      "5. Check the box next to KeyboardMonitor\n"
-                                      "6. Restart the app"];
-            [alert setAlertStyle:NSAlertStyleWarning];
-            
-            // Add buttons
-            [alert addButtonWithTitle:@"Open Privacy Settings"];
-            [alert addButtonWithTitle:@"Quit"];
-            
-            NSModalResponse response = [alert runModal];
-            
-            if (response == NSAlertFirstButtonReturn) {
-                // Open System Preferences to the Accessibility pane
-                NSURL *prefsURL = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
-                [[NSWorkspace sharedWorkspace] openURL:prefsURL];
-                
-                // Also open the Finder to show where the app is
-                [[NSWorkspace sharedWorkspace] selectFile:
-                  [NSString stringWithFormat:@"%@/Code/macos_keylogger/build/KeyboardMonitor.app", 
-                   NSHomeDirectory()] 
-                                  inFileViewerRootedAtPath:@""];
-            }
-            
-            // Quit the app
+            logMessage("ERROR: Failed to create event tap - this should not happen if accessibility is granted");
+
+            // Show error dialog
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:@"Event Tap Creation Failed"];
+                [alert setInformativeText:@"Failed to create keyboard event tap. This may be due to insufficient permissions or system restrictions."];
+                [alert setAlertStyle:NSAlertStyleCritical];
+                [alert addButtonWithTitle:@"Quit"];
+                [alert runModal];
+            });
+
             fclose(logFile);
             return 1;
         }
@@ -533,12 +441,12 @@ int main(int argc, const char * argv[]) {
         
         logMessage("Keyboard event monitoring successfully set up");
         logMessage("Starting application run loop - menu bar icon should appear");
-        
-        // ---- STEP 6: Start the application ----
+
+        // ---- STEP 7: Start the application ----
         // This call blocks until app termination
         [NSApp run];
-        
-        // ---- STEP 7: Clean up (runs on app termination) ----
+
+        // ---- STEP 8: Clean up (runs on app termination) ----
         logMessage("Application terminating - cleaning up resources");
         CFRelease(runLoopSource);
         CFRelease(eventTap);

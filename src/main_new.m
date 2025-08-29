@@ -65,18 +65,10 @@ int main(int argc, const char * argv[]) {
         logMessage("Creating NSApplication instance");
         [NSApplication sharedApplication];
 
-        // For menu bar apps, we need to transform the process
-        // This is an essential step for menu bar apps on modern macOS
-        logMessage("Transforming to UI Element Application (critical for menu bar)");
-        ProcessSerialNumber psn = { 0, kCurrentProcess };
-        OSStatus err = TransformProcessType(&psn, kProcessTransformToUIElementApplication);
-        if (err != noErr) {
-            logMessage("WARNING: Failed to transform process: Error %d", (int)err);
-        }
-
-        // Set activation policy EARLY - critical for menu bar apps
-        logMessage("Setting activation policy to Accessory (menu bar app)");
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        // Do NOT force-transform the process to UIElement here.
+        // Rely on Info.plist (LSUIElement) and allow PermissionsManager
+        // to temporarily switch activation policy for permission prompts.
+        logMessage("Skipping Carbon UIElement transform to allow permission prompts");
 
         // ---- STEP 3: Set up app delegate ----
         logMessage("Creating and setting application delegate");

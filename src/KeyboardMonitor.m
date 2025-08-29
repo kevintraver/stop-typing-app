@@ -68,7 +68,35 @@ static const BOOL kLogRecentChars = NO;
     );
 
     if (!eventTap) {
-        logMessage("ERROR: Failed to create event tap - accessibility permissions required");
+        // Fallback attempt: annotated session event tap (can work on some setups)
+        logMessage("Event tap failed at kCGSessionEventTap, trying kCGAnnotatedSessionEventTap");
+        eventTap = CGEventTapCreate(
+            kCGAnnotatedSessionEventTap,
+            kCGHeadInsertEventTap,
+            kCGEventTapOptionDefault,
+            CGEventMaskBit(kCGEventKeyDown),
+            eventCallback,
+            (__bridge void *)self
+        );
+    }
+
+    if (!eventTap) {
+        BOOL trusted = AXIsProcessTrusted();
+        logMessage("ERROR: Failed to create event tap (trusted=%s). A full app restart may be required after granting Accessibility.",
+                   trusted ? "YES" : "NO");
+        // Show a one-time user hint to restart if needed
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSAlertStyleWarning;
+            alert.messageText = @"Accessibility Activation";
+            alert.informativeText = @"Keyboard Monitor couldn't start capturing keys. If you just enabled Accessibility, quit and relaunch the app. You can also open Accessibility settings to verify the checkbox is enabled.";
+            [alert addButtonWithTitle:@"Open Settings"];
+            [alert addButtonWithTitle:@"Close"];
+            if ([alert runModal] == NSAlertFirstButtonReturn) {
+                NSURL *url = [NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+                [[NSWorkspace sharedWorkspace] openURL:url];
+            }
+        });
         return;
     }
 
@@ -211,6 +239,16 @@ static const BOOL kLogRecentChars = NO;
 static CGEventRef eventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     @autoreleasepool {
         KeyboardMonitor *monitor = (__bridge KeyboardMonitor *)refcon;
+
+        // Handle tap disabled events by re-enabling
+        if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
+            if (monitor->eventTap) {
+                CGEventTapEnable(monitor->eventTap, true);
+                logMessage("KeyboardMonitor: Event tap re-enabled after %s",
+                           (type == kCGEventTapDisabledByTimeout) ? "timeout" : "user input");
+            }
+            return event;
+        }
 
         if (type == kCGEventKeyDown && monitor.isMonitoring) {
             [monitor handleKeyDown:event];

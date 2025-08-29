@@ -15,17 +15,19 @@ all: app
 app: $(APP_DIR)
 
 $(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist
-	@echo "Application bundle created at $(APP_DIR)"
+	codesign --entitlements KeyboardMonitor.entitlements --force --sign - $(APP_DIR)
+	@echo "Application bundle created and signed at $(APP_DIR)"
 
 
-SOURCES = $(SRC_DIR)/main_new.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.m $(SRC_DIR)/Notifications.m $(SRC_DIR)/Accessibility.m
+SOURCES = $(SRC_DIR)/main.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.m $(SRC_DIR)/Notifications.m $(SRC_DIR)/Accessibility.m $(SRC_DIR)/PermissionsManager.m
 
 $(TARGET): $(SOURCES) | $(MACOS_DIR)
 	$(CC) $(CFLAGS) $^ -o $@
+	codesign --entitlements KeyboardMonitor.entitlements --force --sign - $@
 	touch $@  # Ensure it has a fresh timestamp
 
 $(CONTENTS_DIR)/Info.plist: Info.plist | $(CONTENTS_DIR)
-	cp $< $@
+	cp Info.plist $@
 	# Create a PkgInfo file (helps macOS identify the app properly)
 	echo "APPL????" > $(CONTENTS_DIR)/PkgInfo
 
@@ -69,6 +71,39 @@ run-quick:
 	open $(APP_DIR)
 
 run-dev: dev
+	@echo "⚠️  WARNING: Running as standalone executable - notifications will not work!"
+	@echo "   Use 'make run-app' to run from .app bundle with full functionality"
 	$(BUILD_DIR)/$(EXECUTABLE)
+
+# Test notification registration
+test-notifications: app
+	@echo "Testing notification registration..."
+	@echo "1. The app should appear in System Settings → Notifications"
+	@echo "2. Run this command: make run-app"
+	@echo "3. Check if 'Keyboard Monitor' appears in the notifications list"
+	@echo "4. If it doesn't appear, try restarting your Mac"
+	@echo ""
+	@echo "Opening notification settings..."
+	open "x-apple.systempreferences:com.apple.preference.notifications"
+
+# Install to Applications folder (may help with notification registration)
+install: app
+	@echo "Installing to Applications folder..."
+	cp -r build/KeyboardMonitor.app /Applications/
+	@echo "Installed to /Applications/KeyboardMonitor.app"
+	@echo "Now run: open /Applications/KeyboardMonitor.app"
+
+# Run from Applications folder
+run-installed:
+	open /Applications/KeyboardMonitor.app
+
+# Check notification status
+check-notifications:
+	@echo "Checking notification status..."
+	osascript -e 'tell application "System Settings" to activate'
+	osascript -e 'delay 1'
+	osascript -e 'tell application "System Events" to tell process "System Settings" to click menu item "Notifications" of menu "View" of menu bar 1'
+	@echo "System Settings → Notifications should now be open"
+	@echo "Look for 'Keyboard Monitor' in the list"
 
 .PHONY: all clean clean-all app dev run-app run-quick run-dev

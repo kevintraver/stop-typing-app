@@ -8,10 +8,12 @@ void logMessage(const char* format, ...);
 #import <UserNotifications/UserNotifications.h>
 #import "Notifications.h"
 #import "Accessibility.h"
+#import "PermissionsManager.h"
 
 @interface AppDelegate () {
     NSMenuItem *toggleMenuItem;
     NSMenuItem *statusMenuItem;
+    NSTimer *axPollTimer;
 }
 @end
 
@@ -28,11 +30,16 @@ void logMessage(const char* format, ...);
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     logMessage("AppDelegate: applicationDidFinishLaunching called");
 
+    // Debug bundle context
+    NSBundle *bundle = [NSBundle mainBundle];
+    logMessage("Bundle URL: %s", [[[bundle bundleURL] absoluteString] UTF8String]);
+    logMessage("Bundle Identifier: %s", [[bundle bundleIdentifier] UTF8String]);
+
     // Set up the status bar item
     [self setupStatusItem];
 
-    // Request notification authorization (once)
-    NotificationsRequestAuthorization();
+    // Prepare permissions at launch (notifications)
+    [[PermissionsManager shared] setupAtLaunch];
 
     // Ensure Accessibility trust (will prompt if not granted)
     EnsureAccessibilityTrust();
@@ -41,16 +48,28 @@ void logMessage(const char* format, ...);
     _keyboardMonitor = [[KeyboardMonitor alloc] init];
     _keyboardMonitor.delegate = self;
 
-    // Start monitoring if enabled
-    if (_isMonitoringEnabled) {
+    // Start monitoring only when Accessibility is trusted
+    if (_isMonitoringEnabled && [[PermissionsManager shared] isAccessibilityTrusted]) {
         [_keyboardMonitor startMonitoring];
+    } else if (_isMonitoringEnabled && ![[PermissionsManager shared] isAccessibilityTrusted]) {
+        logMessage("Waiting for Accessibility permission...");
+        axPollTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+            if ([[PermissionsManager shared] isAccessibilityTrusted]) {
+                [timer invalidate];
+                logMessage("Accessibility granted. Starting monitoring.");
+                [_keyboardMonitor startMonitoring];
+                Notify(@"Monitoring Enabled", @"Accessibility granted; keyboard monitoring is now active", NO);
+                [self updateStatusItemAppearance];
+            }
+        }];
+        [[PermissionsManager shared] ensureAccessibilityPromptOnce];
     }
 
-    // Send a test notification after a short delay
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+    // Send a test notification after a short delay to register with macOS
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                   dispatch_get_main_queue(), ^{
         NSString *statusMessage = _isMonitoringEnabled ? @"Monitoring keyboard input for excessive typing" : @"Keyboard monitoring is disabled";
-        Notify(@"Keyboard Monitor Active", statusMessage, NO);
+        Notify(@"Keyboard Monitor Active", statusMessage, YES); // Enable sound to make it more noticeable
     });
 
     logMessage("Application initialization complete");
@@ -94,6 +113,19 @@ void logMessage(const char* format, ...);
     [menu addItem:toggleMenuItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
+    // Test notification
+    [menu addItemWithTitle:@"Send Test Notification" action:@selector(sendTestNotification:) keyEquivalent:@""];
+    [menu addItemWithTitle:@"Check Notification Status" action:@selector(checkNotificationStatus:) keyEquivalent:@""];
+    [menu addItem:[NSMenuItem separatorItem]];
+    [menu addItemWithTitle:@"Request Notification Permission" action:@selector(requestNotificationPermission:) keyEquivalent:@""];
+    [menu addItemWithTitle:@"Check App Bundle Status" action:@selector(checkAppBundleStatus:) keyEquivalent:@""];
+    [menu addItemWithTitle:@"Force Register with macOS" action:@selector(forceRegisterWithMacOS:) keyEquivalent:@""];
+
+    // Permissions helpers
+    [menu addItemWithTitle:@"Open Accessibility Settings" action:@selector(openAccessibilitySettings:) keyEquivalent:@""];
+    [menu addItemWithTitle:@"Open Notification Settings" action:@selector(openNotificationSettings:) keyEquivalent:@""];
+    [menu addItem:[NSMenuItem separatorItem]];
+
     // Quit item
     [menu addItemWithTitle:@"Quit" action:@selector(quit:) keyEquivalent:@"q"];
 
@@ -106,6 +138,93 @@ void logMessage(const char* format, ...);
     logMessage("Status bar item configured with toggle functionality");
 }
 
+- (void)openAccessibilitySettings:(id)sender {
+    [[PermissionsManager shared] openAccessibilitySettings];
+}
+
+- (void)openNotificationSettings:(id)sender {
+    [[PermissionsManager shared] openNotificationSettings];
+}
+
+- (void)sendTestNotification:(id)sender {
+    Notify(@"Test", @"This is a test notification", NO);
+}
+
+- (void)checkNotificationStatus:(id)sender {
+    [[PermissionsManager shared] checkNotificationStatusAndReport];
+}
+
+- (void)requestNotificationPermission:(id)sender {
+    logMessage("Manually requesting notification permission");
+
+    // First check if we're in an app bundle
+    NSBundle *bundle = [NSBundle mainBundle];
+    if (!bundle || ![bundle bundleIdentifier] || ![[bundle bundlePath] containsString:@".app"]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSAlertStyleWarning;
+            alert.messageText = @"Bundle Issue";
+            alert.informativeText = @"App must be run from .app bundle for notifications to work.\n\nDouble-click KeyboardMonitor.app instead of running the executable directly.";
+            [alert addButtonWithTitle:@"OK"];
+            [alert runModal];
+        });
+        return;
+    }
+
+    // Force re-request authorization
+    NotificationsRequestAuthorization();
+
+    // Also try to manually trigger the system dialog
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                  dispatch_get_main_queue(), ^{
+        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+
+        [center requestAuthorizationWithOptions:options
+                              completionHandler:^(BOOL granted, NSError * _Nullable error) {
+            logMessage("Manual authorization request: granted=%@ error=%@", granted ? @"YES" : @"NO", error);
+        }];
+    });
+}
+
+- (void)checkAppBundleStatus:(id)sender {
+    NSBundle *bundle = [NSBundle mainBundle];
+    NSString *bundlePath = [bundle bundlePath];
+    NSString *bundleId = [bundle bundleIdentifier];
+    NSString *executablePath = [[NSProcessInfo processInfo] arguments][0];
+    BOOL isInAppBundle = [bundlePath containsString:@".app"];
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.alertStyle = NSAlertStyleInformational;
+        alert.messageText = @"App Bundle Status";
+        alert.informativeText = [NSString stringWithFormat:@"Bundle Path: %@\nBundle ID: %@\nExecutable: %@\nIn App Bundle: %@\n\nFor notifications to work, 'In App Bundle' must be YES.",
+                                bundlePath, bundleId, executablePath, isInAppBundle ? @"YES" : @"NO"];
+        [alert addButtonWithTitle:@"OK"];
+        [alert runModal];
+    });
+}
+
+- (void)forceRegisterWithMacOS:(id)sender {
+    logMessage("Forcing registration with macOS by sending multiple notifications");
+
+    // Send a series of notifications to ensure macOS recognizes the app
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                  dispatch_get_main_queue(), ^{
+        Notify(@"Registration 1", @"This notification helps register the app with macOS", YES);
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                  dispatch_get_main_queue(), ^{
+        Notify(@"Registration 2", @"Multiple notifications ensure proper registration", YES);
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),
+                  dispatch_get_main_queue(), ^{
+        Notify(@"Registration Complete", @"App should now appear in System Settings → Notifications", YES);
+    });
+}
+
 - (void)updateStatusItemAppearance {
     if (_isMonitoringEnabled) {
         // Use simple text "KM" when monitoring
@@ -113,7 +232,7 @@ void logMessage(const char* format, ...);
 
     if (_statusItem.button) {
         // Modern approach (macOS 10.14+)
-        logMessage("Setting button title to: %@", title);
+        logMessage("Setting button title to: %s", [title UTF8String]);
         _statusItem.button.title = title;
         _statusItem.button.font = [NSFont boldSystemFontOfSize:12.0];
         logMessage("Button title set successfully");
@@ -143,7 +262,7 @@ void logMessage(const char* format, ...);
     // Also use the legacy approach as backup
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    logMessage("Setting legacy title to: %@", title);
+    logMessage("Setting legacy title to: %s", [title UTF8String]);
     [_statusItem setTitle:title];
     #pragma clang diagnostic pop
     logMessage("Legacy title set successfully");

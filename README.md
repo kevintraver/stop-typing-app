@@ -37,24 +37,45 @@ This application demonstrates how to:
 ## Building and Running
 
 1. Navigate to the project directory:
-   ```
-   cd ~/code/macos_keylogger
-   ```
+    ```
+    cd ~/code/macos_keylogger
+    ```
 
 2. Compile the application:
-   ```
-   make
-   ```
+    ```
+    make
+    ```
 
-3. Run the application:
-   ```
-   ./build/keylogger
-   ```
+3. **Run from the app bundle (recommended for full functionality):**
+    ```
+    make run-app
+    ```
+    This runs the app from its proper .app bundle, enabling notifications.
 
-4. Grant accessibility permissions when prompted
-5. The app will show a keyboard icon (⌨️) in your menu bar and start monitoring your typing
+4. **Alternative: Run development binary:**
+    ```
+    make run-dev
+    ```
+    ⚠️ **Warning:** Running as a standalone executable disables notifications. Use this only for development/testing.
 
-Note: Notifications require running from the .app bundle (use `make run-app`). When running the dev binary (`make run-dev`), notifications are suppressed.
+5. Grant accessibility permissions when prompted
+6. The app will show a "KM" icon in your menu bar and start monitoring your typing
+
+## Troubleshooting
+
+### Notifications Not Working
+- **Problem:** No notifications appear when typing threshold is reached
+- **Solution:** Make sure you're running from the .app bundle (`make run-app`), not the dev binary
+- **Check:** System Settings → Notifications → Keyboard Monitor should be enabled
+
+### App Won't Start
+- **Problem:** App crashes on launch
+- **Solution:** Ensure Accessibility permissions are granted in System Settings → Privacy & Security → Accessibility
+- **Alternative:** Run `make run-app` to launch from Finder if the terminal method fails
+
+### No Menu Bar Icon
+- **Problem:** App runs but no icon appears in menu bar
+- **Solution:** Check the console output for error messages, ensure proper permissions are granted
 
 ## Configuration
 
