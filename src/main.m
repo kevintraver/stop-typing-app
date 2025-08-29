@@ -44,7 +44,18 @@ BOOL showDebounceInfo = YES;              // Show detailed timing information
 NSMutableString *recentChars;             // Buffer of recent characters
 NSDate *lastKeyPressTime;                 // Last keypress timestamp
 BOOL warningDisplayed = NO;               // Flag to prevent multiple warnings
-int consecutiveChars = 0;                 // Count of consecutive characters typed
+int consecutiveChars = 0;                 // Legacy counter (mirrors burstChars)
+
+// Prose-aware counters (reset on inactivity)
+int burstChars = 0;       // printable, prose-like chars in current burst
+int alphaChars = 0;       // letters counted in current burst
+int spaceChars = 0;       // spaces/newlines in current burst
+int sentencePuncts = 0;   // '.', '!', '?'
+uint32_t letterMask = 0;  // distinct letters bitmask (a-z)
+int distinctLetters = 0;  // number of distinct letters
+NSDate *burstStartTime;   // start time of current burst
+NSDate *lastEscalationTime; // pacing for escalations
+NSDate *lastWarningTime;  // cooldown reference
 
 // Global file handle for logging (used by AppDelegate) - declared at top of file
 
@@ -100,6 +111,14 @@ void resetTracking() {
     warningDisplayed = NO;
     lastKeyPressTime = [NSDate date];
     [recentChars setString:@""];
+    // Reset prose-aware counters
+    burstChars = 0;
+    alphaChars = 0;
+    spaceChars = 0;
+    sentencePuncts = 0;
+    letterMask = 0;
+    distinctLetters = 0;
+    burstStartTime = [NSDate date];
     logMessage("Tracking state reset");
 }
 
@@ -169,6 +188,7 @@ void showWarning() {
     
     // Show system notification - no sound
     showNotification(title, message, NO);
+    lastWarningTime = [NSDate date];
 }
 
 // Check if a character is a letter (A-Z, a-z)
@@ -176,12 +196,40 @@ BOOL isLetter(unichar c) {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
+BOOL isDigit(unichar c) {
+    return (c >= '0' && c <= '9');
+}
+
+BOOL isWhitespace(unichar c) {
+    return (c == ' ' || c == '\n' || c == '\r' || c == '\t');
+}
+
+BOOL isSentencePunct(unichar c) {
+    return (c == '.' || c == '!' || c == '?');
+}
+
+BOOL isProsePunct(unichar c) {
+    switch (c) {
+        case ',': case ';': case ':': case '\'': case '"':
+        case '-': case '(': case ')': case '[': case ']':
+            return YES;
+        default:
+            return NO;
+    }
+}
+
 // Callback function called for each keyboard event
 CGEventRef eventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     @autoreleasepool {
         if (type == kCGEventKeyDown) {
-            // Check for inactivity
-            checkInactivityReset();
+            // Custom inactivity handling to set burst boundaries
+            if (!lastKeyPressTime) lastKeyPressTime = [NSDate date];
+            NSTimeInterval sinceLast = [[NSDate date] timeIntervalSinceDate:lastKeyPressTime];
+            if (sinceLast >= 5.0) {
+                resetTracking();
+            } else if (sinceLast >= 2.5 && burstChars < 10) {
+                resetTracking();
+            }
             
             // Update typing tracking timestamp
             lastKeyPressTime = [NSDate date];
@@ -214,8 +262,8 @@ CGEventRef eventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef eve
                 isLetterKey = isLetter(buffer[0]);
             }
             
-            // Check for reset keys
-            BOOL isResetKey = (keyCode == kVK_Return || keyCode == kVK_Escape);
+            // Check for reset keys (Escape only). Return/Tab count as textual.
+            BOOL isResetKey = (keyCode == kVK_Escape);
             
             // Log keystroke info
             logMessage("KEY: code=%d, char='%s', isLetter=%s, mod=%s", 
@@ -229,42 +277,12 @@ CGEventRef eventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef eve
                 recentChars = [[NSMutableString alloc] init];
             }
             
-            // Handle letter keys - count them
-            if (isLetterKey && !hasModifier) {
-                // Increment counter
-                consecutiveChars++;
-                
-                // Add to buffer
-                [recentChars appendString:charString];
-                
-                // Calculate how many more characters until warning
-                int remaining = MAX_CONSECUTIVE_CHARS - consecutiveChars;
-                
-                // Log counter with progress toward warning
-                if (remaining > 0) {
-                    logMessage("LETTER COUNT: %d/%d - Added: '%s' (%d more until warning)", 
-                            consecutiveChars, MAX_CONSECUTIVE_CHARS, 
-                            [charString UTF8String], remaining);
-                } else {
-                    logMessage("LETTER COUNT: %d/%d - Added: '%s' (OVER LIMIT)", 
-                            consecutiveChars, MAX_CONSECUTIVE_CHARS, 
-                            [charString UTF8String]);
-                }
-                
-                // Check warning threshold
-                if (consecutiveChars >= MAX_CONSECUTIVE_CHARS && !warningDisplayed) {
-                    showWarning();
-                }
-            }
-            // Handle reset keys
-            else if (isResetKey) {
+            // Treat Escape as burst reset point
+            if (isResetKey) {
                 if (consecutiveChars > 0) {
                     logMessage("RESET: Key %d ('%s') pressed - resetting from %d chars", 
                              keyCode, [charString UTF8String], consecutiveChars);
-                    consecutiveChars = 0;
-                    if (recentChars) {
-                        [recentChars setString:@""];
-                    }
+                    resetTracking();
                 }
             }
             // Handle modifier key combinations
@@ -272,10 +290,91 @@ CGEventRef eventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef eve
                 logMessage("SHORTCUT: Key %d with modifiers - count stays at %d", 
                          keyCode, consecutiveChars);
             }
-            // Other keys - just log
+            // Prose-aware counting for text-like input (letters/digits/space/punct)
             else {
-                logMessage("NON-LETTER: Key %d ('%s') - count stays at %d", 
-                         keyCode, [charString UTF8String], consecutiveChars);
+                BOOL countedAny = NO;
+                for (NSUInteger i = 0; i < [charString length]; i++) {
+                    unichar c = [charString characterAtIndex:i];
+                    if (isLetter(c)) {
+                        alphaChars++;
+                        burstChars++;
+                        // track distinct letters (case-insensitive)
+                        unichar lc = (c >= 'A' && c <= 'Z') ? (c - 'A' + 'a') : c;
+                        if (lc >= 'a' && lc <= 'z') {
+                            uint32_t bit = 1u << (lc - 'a');
+                            if ((letterMask & bit) == 0) {
+                                letterMask |= bit;
+                                distinctLetters++;
+                            }
+                        }
+                        countedAny = YES;
+                    } else if (isDigit(c)) {
+                        burstChars++;
+                        countedAny = YES;
+                    } else if (isWhitespace(c)) {
+                        spaceChars++;
+                        burstChars++;
+                        countedAny = YES;
+                    } else if (isSentencePunct(c) || isProsePunct(c)) {
+                        if (isSentencePunct(c)) {
+                            sentencePuncts++;
+                        }
+                        burstChars++;
+                        countedAny = YES;
+                    } else {
+                        // Not a textual char -> ignore
+                    }
+                }
+
+                if (countedAny) {
+                    consecutiveChars = burstChars; // maintain legacy counter semantics
+                    [recentChars appendString:charString];
+                    if ([recentChars length] > 200) {
+                        [recentChars deleteCharactersInRange:NSMakeRange(0, [recentChars length] - 200)];
+                    }
+
+                    float alphaRatio = (burstChars > 0) ? ((float)alphaChars / (float)burstChars) : 0.0f;
+                    BOOL diversityOK = (distinctLetters >= 3) || (spaceChars >= 1) || (sentencePuncts >= 1);
+
+                    if (!burstStartTime) burstStartTime = [NSDate date];
+                    NSTimeInterval burstElapsed = [[NSDate date] timeIntervalSinceDate:burstStartTime];
+
+                    const int sentenceMin = 25;     // 25–40
+                    const int paragraphMin = 80;    // 80–100
+                    const double continuousMinSec = 60.0; // 60–90
+
+                    BOOL inCooldown = NO;
+                    if (lastWarningTime) {
+                        NSTimeInterval sinceWarn = [[NSDate date] timeIntervalSinceDate:lastWarningTime];
+                        inCooldown = (sinceWarn < 120.0);
+                    }
+
+                    BOOL sentenceTrigger = (burstChars >= sentenceMin && diversityOK);
+                    BOOL paragraphTrigger = (burstChars >= paragraphMin && diversityOK);
+                    BOOL continuousTrigger = (burstElapsed >= continuousMinSec);
+
+                    if (showDebounceInfo) {
+                        logMessage("PROSE: chars=%d, spaces=%d, sentences=%d, alpha=%.2f, distinct=%d, elapsed=%.1fs",
+                                   burstChars, spaceChars, sentencePuncts, alphaRatio, distinctLetters, burstElapsed);
+                    }
+
+                    if (!warningDisplayed && (sentenceTrigger || paragraphTrigger || continuousTrigger)) {
+                        showWarning();
+                    } else if (inCooldown && (paragraphTrigger || continuousTrigger)) {
+                        BOOL canEscalate = YES;
+                        if (lastEscalationTime) {
+                            NSTimeInterval sinceEsc = [[NSDate date] timeIntervalSinceDate:lastEscalationTime];
+                            canEscalate = (sinceEsc >= 30.0);
+                        }
+                        if (canEscalate) {
+                            lastEscalationTime = [NSDate date];
+                            logMessage("ESCALATION: Continued typing detected (chars=%d, elapsed=%.0fs)", burstChars, burstElapsed);
+                            showNotification(@"⚠️ Typing Warning", @"Seriously — switch to voice.", NO);
+                        }
+                    }
+                } else {
+                    logMessage("NON-TEXT: Key %d ('%s') - not counted", keyCode, [charString UTF8String]);
+                }
             }
         }
     }
