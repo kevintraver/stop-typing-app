@@ -209,6 +209,11 @@ void Notify(NSString *title, NSString *message, BOOL playSound) {
     content.title = title ?: @"";
     content.body = message ?: @"";
 
+    // Do not attach the app icon. The system automatically
+    // displays the delivering app's icon on the left of the banner.
+    // Adding an attachment is unnecessary here and .icns is not a
+    // supported attachment type for UNNotificationAttachment.
+
     // Set sound
     if (playSound) {
         content.sound = [UNNotificationSound defaultSound];

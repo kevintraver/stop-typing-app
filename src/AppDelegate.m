@@ -35,6 +35,19 @@ void logMessage(const char* format, ...);
     logMessage("Bundle URL: %s", [[[bundle bundleURL] absoluteString] UTF8String]);
     logMessage("Bundle Identifier: %s", [[bundle bundleIdentifier] UTF8String]);
 
+    // Ensure the application icon image is set so notifications
+    // display our app icon instead of a generic placeholder.
+    NSImage *appIcon = [NSImage imageNamed:@"StopTyping"]; // try named first
+    if (!appIcon) {
+        NSString *iconPath = [bundle pathForResource:@"StopTyping" ofType:@"icns"];
+        if (iconPath) {
+            appIcon = [[NSImage alloc] initWithContentsOfFile:iconPath];
+        }
+    }
+    if (appIcon) {
+        [NSApp setApplicationIconImage:appIcon];
+    }
+
     // Set up the status bar item
     [self setupStatusItem];
 
@@ -128,47 +141,99 @@ void logMessage(const char* format, ...);
 
 - (void)updateStatusItemAppearance {
     if (_isMonitoringEnabled) {
-        // Use simple text "KM" when monitoring
-        NSString *title = @"KM";
-
-    if (_statusItem.button) {
-        // Modern approach (macOS 10.14+)
-        logMessage("Setting button title to: %s", [title UTF8String]);
-        _statusItem.button.title = title;
-        _statusItem.button.font = [NSFont boldSystemFontOfSize:12.0];
-        logMessage("Button title set successfully");
-    } else {
-        logMessage("WARNING: Status item has no button, using legacy API");
-    }
-
-        // Also use the legacy approach as backup
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        [_statusItem setTitle:title];
-        #pragma clang diagnostic pop
+        // Use keyboard icon when monitoring
+        NSImage *icon = [NSImage imageNamed:@"StopTyping"];
+        if (!icon) {
+            // Fallback to bundle icon if named image not found
+            icon = [NSImage imageNamed:NSImageNameApplicationIcon];
+        }
+        
+        if (icon) {
+            // Resize icon for menu bar (16x16 is standard)
+            NSSize iconSize = NSMakeSize(16, 16);
+            [icon setSize:iconSize];
+            [icon setTemplate:YES]; // This makes it automatically white/dark themed
+            
+            if (_statusItem.button) {
+                // Modern approach (macOS 10.14+)
+                logMessage("Setting button icon");
+                _statusItem.button.image = icon;
+                _statusItem.button.title = @""; // Clear any text
+                logMessage("Button icon set successfully");
+            } else {
+                logMessage("WARNING: Status item has no button, using legacy API");
+                // Also use the legacy approach as backup
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                [_statusItem setImage:icon];
+                [_statusItem setTitle:@""];
+                #pragma clang diagnostic pop
+            }
+        } else {
+            // Fallback to text if icon not found
+            NSString *title = @"KM";
+            if (_statusItem.button) {
+                _statusItem.button.title = title;
+                _statusItem.button.font = [NSFont boldSystemFontOfSize:12.0];
+            }
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            [_statusItem setTitle:title];
+            #pragma clang diagnostic pop
+        }
 
         // Update menu items
         [statusMenuItem setTitle:@"Status: Monitoring"];
         [toggleMenuItem setTitle:@"Disable Monitoring"];
     } else {
-        // Use different text when disabled
-        NSString *title = @"KM⏸";
+        // Use dimmed icon when disabled
+        NSImage *icon = [NSImage imageNamed:@"StopTyping"];
+        if (!icon) {
+            // Fallback to bundle icon if named image not found
+            icon = [NSImage imageNamed:NSImageNameApplicationIcon];
+        }
+        
+        if (icon) {
+            // Resize and dim the icon
+            NSSize iconSize = NSMakeSize(16, 16);
+            [icon setSize:iconSize];
+            [icon setTemplate:YES]; // This makes it automatically white/dark themed
+            
+            // Create a dimmed version of the icon
+            NSImage *dimmedIcon = [[NSImage alloc] initWithSize:iconSize];
+            [dimmedIcon lockFocus];
+            [icon drawInRect:NSMakeRect(0, 0, iconSize.width, iconSize.height) 
+                    fromRect:NSZeroRect 
+                   operation:NSCompositingOperationSourceOver 
+                    fraction:0.5]; // 50% opacity for disabled state
+            [dimmedIcon unlockFocus];
+            
+            if (_statusItem.button) {
+                // Modern approach (macOS 10.14+)
+                _statusItem.button.image = dimmedIcon;
+                _statusItem.button.title = @""; // Clear any text
+            } else {
+                // Legacy approach as backup
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                [_statusItem setImage:dimmedIcon];
+                [_statusItem setTitle:@""];
+                #pragma clang diagnostic pop
+            }
+        } else {
+            // Fallback to text if icon not found
+            NSString *title = @"KM⏸";
+            if (_statusItem.button) {
+                _statusItem.button.title = title;
+                _statusItem.button.font = [NSFont systemFontOfSize:12.0]; // Not bold when disabled
+            }
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            [_statusItem setTitle:title];
+            #pragma clang diagnostic pop
+        }
 
-        if (_statusItem.button) {
-            // Modern approach (macOS 10.14+)
-            _statusItem.button.title = title;
-            _statusItem.button.font = [NSFont systemFontOfSize:12.0]; // Not bold when disabled
-    }
-
-    // Also use the legacy approach as backup
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    logMessage("Setting legacy title to: %s", [title UTF8String]);
-    [_statusItem setTitle:title];
-    #pragma clang diagnostic pop
-    logMessage("Legacy title set successfully");
-
-    // Update menu items
+        // Update menu items
         [statusMenuItem setTitle:@"Status: Disabled"];
         [toggleMenuItem setTitle:@"Enable Monitoring"];
     }

@@ -14,7 +14,7 @@ all: app
 
 app: $(APP_DIR)
 
-$(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist
+$(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist $(RESOURCES_DIR)/StopTyping.icns
 	codesign --entitlements StopTyping.entitlements --force --sign - $(APP_DIR)
 	@echo "Application bundle created and signed at $(APP_DIR)"
 
@@ -30,6 +30,9 @@ $(CONTENTS_DIR)/Info.plist: Info.plist | $(CONTENTS_DIR)
 	cp Info.plist $@
 	# Create a PkgInfo file (helps macOS identify the app properly)
 	echo "APPL????" > $(CONTENTS_DIR)/PkgInfo
+
+$(RESOURCES_DIR)/StopTyping.icns: StopTyping.icns | $(RESOURCES_DIR)
+	cp StopTyping.icns $@
 
 $(MACOS_DIR):
 	mkdir -p $(MACOS_DIR)
