@@ -54,12 +54,14 @@ This application demonstrates how to:
 4. Grant accessibility permissions when prompted
 5. The app will show a keyboard icon (⌨️) in your menu bar and start monitoring your typing
 
+Note: Notifications require running from the .app bundle (use `make run-app`). When running the dev binary (`make run-dev`), notifications are suppressed.
+
 ## Configuration
 
-You can modify these constants in `src/main.m` to adjust the behavior:
+You can modify these in `src/KeyboardMonitor.m` or surface a UI later:
 
-- `MAX_CONSECUTIVE_CHARS`: The number of consecutive characters before showing a warning (default: 5)
-- `TYPING_COOLDOWN_MS`: Time in milliseconds of inactivity before resetting the counter (default: 1500)
+- `maxConsecutiveChars`: The number of consecutive characters before showing a warning (default: 15)
+- `typingCooldownMs`: Time in milliseconds of inactivity before resetting the counter (default: 3000)
 
 ## Implementation Notes
 
@@ -100,10 +102,10 @@ While this project was inspired by espanso's keyboard tracking, it differs in se
 
 ## Security and Privacy
 
-This application requires accessibility permissions to monitor keyboard events. It:
+This application requires Accessibility permissions to monitor keyboard events. It:
 - Does not send any data over the network
-- Only logs locally to your home directory
-- Does not record sensitive information
+- Logs only operational status by default; it does not log characters
+- Keeps any ephemeral buffers in memory only
 
 ## Acknowledgments
 
@@ -111,6 +113,7 @@ This application requires accessibility permissions to monitor keyboard events. 
 - Keyboard event tracking approach inspired by espanso's implementation
 - Used espanso's source code as reference for macOS keyboard event handling
 
-## License
+## Notes
 
-This project is provided for educational purposes only.
+- Uses `UserNotifications` (modern notifications) and ARC.
+- Status bar icon currently uses text; consider a template image asset for better dark-mode support.

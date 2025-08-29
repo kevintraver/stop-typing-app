@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -Wall -g -framework Foundation -framework Cocoa -framework Carbon
+CFLAGS = -Wall -g -fobjc-arc -framework Foundation -framework Cocoa -framework Carbon -framework UserNotifications
 SRC_DIR = src
 BUILD_DIR = build
 APP_NAME = KeyboardMonitor
@@ -17,8 +17,11 @@ app: $(APP_DIR)
 $(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist
 	@echo "Application bundle created at $(APP_DIR)"
 
-$(TARGET): $(SRC_DIR)/main.m | $(MACOS_DIR)
-	$(CC) $(CFLAGS) $< -o $@
+
+SOURCES = $(SRC_DIR)/main_new.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.m $(SRC_DIR)/Notifications.m $(SRC_DIR)/Accessibility.m
+
+$(TARGET): $(SOURCES) | $(MACOS_DIR)
+	$(CC) $(CFLAGS) $^ -o $@
 	touch $@  # Ensure it has a fresh timestamp
 
 $(CONTENTS_DIR)/Info.plist: Info.plist | $(CONTENTS_DIR)
@@ -49,8 +52,8 @@ clean-all:
 # Build and run the standalone executable for development
 dev: $(BUILD_DIR)/$(EXECUTABLE)
 
-$(BUILD_DIR)/$(EXECUTABLE): $(SRC_DIR)/main.m | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/$(EXECUTABLE): $(SOURCES) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $^ -o $@
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -62,7 +65,7 @@ run-app: app
 run-quick:
 	# Just recompile the executable and replace it in the existing app bundle
 	mkdir -p $(MACOS_DIR)
-	$(CC) $(CFLAGS) $(SRC_DIR)/main.m -o $(MACOS_DIR)/$(EXECUTABLE)
+	$(CC) $(CFLAGS) $(SOURCES) -o $(MACOS_DIR)/$(EXECUTABLE)
 	open $(APP_DIR)
 
 run-dev: dev

@@ -283,14 +283,14 @@ void showWarning() {
         logMessage("⚠️  RECENT KEYS: %s", [recentChars UTF8String]);
     }
     
-    logMessage("⚠️  TRY USING VOICE-TO-TEXT INSTEAD         ⚠️");
+    logMessage("⚠️  TRY USING SUPER WHISPER INSTEAD         ⚠️");
     logMessage("⚠️  Warning will clear after %d sec of inactivity  ⚠️", TYPING_COOLDOWN_MS/1000);
     logMessage("⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️");
     logMessage("");
     
     // Prepare notification message
     NSString *title = @"⚠️ Typing Warning";
-    NSString *message = @"You're typing a lot. Try using voice-to-text instead!";
+    NSString *message = @"You're typing a lot. Try using Super Whisper instead!";
     
     // Show system notification - no sound
     showNotification(title, message, NO);
@@ -458,7 +458,7 @@ int main(int argc, const char * argv[]) {
         // Log configuration
         logMessage("⚠️  WARNING AFTER: %d consecutive letter keys", MAX_CONSECUTIVE_CHARS);
         logMessage("🔄  COUNTER RESETS: After %d seconds of inactivity", TYPING_COOLDOWN_MS/1000);
-        logMessage("💬  SUGGESTION: Use voice-to-text instead of typing");
+        logMessage("💬  SUGGESTION: Use Super Whisper instead of typing");
         logMessage("📝  LOG LOCATION: %s", [logPath UTF8String]);
         logMessage("==============================================");
         
