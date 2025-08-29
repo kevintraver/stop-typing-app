@@ -26,7 +26,7 @@
                  NSAlert *alert = [[NSAlert alloc] init];
                  alert.alertStyle = NSAlertStyleWarning;
                  alert.messageText = @"Accessibility Permission Required";
-                 alert.informativeText = @"Enable Accessibility for Keyboard Monitor in System Settings → Privacy & Security → Accessibility. After enabling, return to the app; it will start automatically.";
+                 alert.informativeText = @"Enable Accessibility for StopTyping in System Settings → Privacy & Security → Accessibility. After enabling, return to the app; it will start automatically.";
                  [alert addButtonWithTitle:@"Open Settings"];
                  [alert addButtonWithTitle:@"Later"];
                  NSModalResponse response = [alert runModal];

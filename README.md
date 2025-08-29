@@ -66,7 +66,7 @@ This application demonstrates how to:
 ### Notifications Not Working
 - **Problem:** No notifications appear when typing threshold is reached
 - **Solution:** Make sure you're running from the .app bundle (`make run-app`), not the dev binary
-- **Check:** System Settings → Notifications → Keyboard Monitor should be enabled
+- **Check:** System Settings → Notifications → StopTyping should be enabled
 
 ### App Won't Start
 - **Problem:** App crashes on launch

@@ -371,7 +371,7 @@ int main(int argc, const char * argv[]) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 NSAlert *alert = [[NSAlert alloc] init];
                 [alert setMessageText:@"Accessibility Permission Required"];
-                [alert setInformativeText:@"KeyboardMonitor needs accessibility permissions to monitor keyboard input.\n\n"
+                [alert setInformativeText:@"StopTyping needs accessibility permissions to monitor keyboard input.\n\n"
                                            "Please enable accessibility permissions in System Settings → Privacy & Security → Accessibility, then restart the app."];
                 [alert setAlertStyle:NSAlertStyleWarning];
 

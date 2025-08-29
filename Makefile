@@ -2,7 +2,7 @@ CC = clang
 CFLAGS = -Wall -g -fobjc-arc -framework Foundation -framework Cocoa -framework Carbon -framework UserNotifications
 SRC_DIR = src
 BUILD_DIR = build
-APP_NAME = KeyboardMonitor
+APP_NAME = StopTyping
 APP_DIR = $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR = $(APP_DIR)/Contents
 MACOS_DIR = $(CONTENTS_DIR)/MacOS
@@ -15,7 +15,7 @@ all: app
 app: $(APP_DIR)
 
 $(APP_DIR): $(TARGET) $(CONTENTS_DIR)/Info.plist
-	codesign --entitlements KeyboardMonitor.entitlements --force --sign - $(APP_DIR)
+	codesign --entitlements StopTyping.entitlements --force --sign - $(APP_DIR)
 	@echo "Application bundle created and signed at $(APP_DIR)"
 
 
@@ -23,7 +23,7 @@ SOURCES = $(SRC_DIR)/main.m $(SRC_DIR)/AppDelegate.m $(SRC_DIR)/KeyboardMonitor.
 
 $(TARGET): $(SOURCES) | $(MACOS_DIR)
 	$(CC) $(CFLAGS) $^ -o $@
-	codesign --entitlements KeyboardMonitor.entitlements --force --sign - $@
+	codesign --entitlements StopTyping.entitlements --force --sign - $@
 	touch $@  # Ensure it has a fresh timestamp
 
 $(CONTENTS_DIR)/Info.plist: Info.plist | $(CONTENTS_DIR)
@@ -80,7 +80,7 @@ test-notifications: app
 	@echo "Testing notification registration..."
 	@echo "1. The app should appear in System Settings → Notifications"
 	@echo "2. Run this command: make run-app"
-	@echo "3. Check if 'Keyboard Monitor' appears in the notifications list"
+	@echo "3. Check if 'StopTyping' appears in the notifications list"
 	@echo "4. If it doesn't appear, try restarting your Mac"
 	@echo ""
 	@echo "Opening notification settings..."
@@ -89,13 +89,13 @@ test-notifications: app
 # Install to Applications folder (may help with notification registration)
 install: app
 	@echo "Installing to Applications folder..."
-	cp -r build/KeyboardMonitor.app /Applications/
-	@echo "Installed to /Applications/KeyboardMonitor.app"
-	@echo "Now run: open /Applications/KeyboardMonitor.app"
+	cp -r build/StopTyping.app /Applications/
+	@echo "Installed to /Applications/StopTyping.app"
+	@echo "Now run: open /Applications/StopTyping.app"
 
 # Run from Applications folder
 run-installed:
-	open /Applications/KeyboardMonitor.app
+	open /Applications/StopTyping.app
 
 # Check notification status
 check-notifications:
@@ -104,6 +104,6 @@ check-notifications:
 	osascript -e 'delay 1'
 	osascript -e 'tell application "System Events" to tell process "System Settings" to click menu item "Notifications" of menu "View" of menu bar 1'
 	@echo "System Settings → Notifications should now be open"
-	@echo "Look for 'Keyboard Monitor' in the list"
+	@echo "Look for 'StopTyping' in the list"
 
 .PHONY: all clean clean-all app dev run-app run-quick run-dev

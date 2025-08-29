@@ -122,7 +122,7 @@ void NotificationsRequestAuthorization(void) {
                 NSAlert *alert = [[NSAlert alloc] init];
                 alert.alertStyle = NSAlertStyleInformational;
                 alert.messageText = @"Notifications Disabled";
-                alert.informativeText = @"Notifications are disabled for Keyboard Monitor. Enable them in System Settings → Notifications to receive typing warnings.";
+                alert.informativeText = @"Notifications are disabled for StopTyping. Enable them in System Settings → Notifications to receive typing warnings.";
                 [alert addButtonWithTitle:@"Open Notification Settings"];
                 [alert addButtonWithTitle:@"Close"];
                 if ([alert runModal] == NSAlertFirstButtonReturn) {
@@ -164,7 +164,7 @@ void NotificationsRequestAuthorization(void) {
                                 NSAlert *alert = [[NSAlert alloc] init];
                                 alert.alertStyle = NSAlertStyleInformational;
                                 alert.messageText = @"Allow Notifications";
-                                alert.informativeText = @"To enable notifications:\n\n1. Go to System Settings → Notifications\n2. Find 'Keyboard Monitor' in the app list\n3. Turn on 'Allow Notifications'\n4. Enable alerts and sounds\n\nIf you don't see the app in the list, try:\n- Restarting the app\n- Restarting your Mac\n- Checking Console.app for errors";
+                                alert.informativeText = @"To enable notifications:\n\n1. Go to System Settings → Notifications\n2. Find 'StopTyping' in the app list\n3. Turn on 'Allow Notifications'\n4. Enable alerts and sounds\n\nIf you don't see the app in the list, try:\n- Restarting the app\n- Restarting your Mac\n- Checking Console.app for errors";
                                 [alert addButtonWithTitle:@"Open Notification Settings"];
                                 [alert addButtonWithTitle:@"Later"];
                                 if ([alert runModal] == NSAlertFirstButtonReturn) {
@@ -176,7 +176,7 @@ void NotificationsRequestAuthorization(void) {
                             // Send a test notification to ensure everything works
                             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
                                           dispatch_get_main_queue(), ^{
-                                Notify(@"Notifications Enabled", @"Keyboard Monitor notifications are now active", YES);
+                                Notify(@"Notifications Enabled", @"StopTyping notifications are now active", YES);
                             });
                         }
                     }];
@@ -185,7 +185,7 @@ void NotificationsRequestAuthorization(void) {
                 // Send a test notification to ensure everything works
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
                               dispatch_get_main_queue(), ^{
-                    Notify(@"Notifications Enabled", @"Keyboard Monitor notifications are now active", YES);
+                    Notify(@"Notifications Enabled", @"StopTyping notifications are now active", YES);
                 });
             }
         }];

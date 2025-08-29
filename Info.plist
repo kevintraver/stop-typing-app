@@ -5,9 +5,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.kevin.KeyboardMonitor</string>
     <key>CFBundleName</key>
-    <string>Keyboard Monitor</string>
+    <string>StopTyping</string>
     <key>CFBundleDisplayName</key>
-    <string>Keyboard Monitor</string>
+    <string>StopTyping</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -122,6 +122,6 @@
     <key>NSAppleScriptReadWriteUsageDescription</key>
     <string>This app may use AppleScript to deliver notifications.</string>
     <key>CFBundleEntitlements</key>
-    <string>KeyboardMonitor.entitlements</string>
+    <string>StopTyping.entitlements</string>
 </dict>
 </plist>
