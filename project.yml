@@ -1,0 +1,56 @@
+name: StopTyping
+
+options:
+  bundleIdPrefix: com.kevintraver
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  StopTypingCore:
+    path: StopTypingCore
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "2.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  StopTyping:
+    type: application
+    platform: macOS
+    sources:
+      - path: StopTyping
+        excludes:
+          - Resources/AppIcon.icon
+      - path: StopTyping/Resources/AppIcon.icon
+        type: file
+        buildPhase: resources
+    dependencies:
+      - package: StopTypingCore
+    info:
+      path: StopTyping/Info.plist
+      properties:
+        CFBundleDisplayName: Stop Typing App
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: "© 2026 Kevin Traver"
+        NSFocusStatusUsageDescription: Stop Typing App stays quiet while a Focus like Do Not Disturb is on.
+    entitlements:
+      path: StopTyping/StopTyping.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-only: true
+    settings:
+      base:
+        PRODUCT_NAME: Stop Typing App
+        PRODUCT_MODULE_NAME: StopTyping
+        PRODUCT_BUNDLE_IDENTIFIER: com.kevintraver.StopTyping
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        # A stable signing identity keeps macOS's Input Monitoring grant across rebuilds.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: 8EDDZ23NT2

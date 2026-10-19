@@ -1,0 +1,14 @@
+{
+  "fill" : { "linear-gradient" : [ "display-p3:1.00000,1.00000,1.00000,1.00000", "display-p3:0.84000,0.85000,0.88000,1.00000" ] },
+  "groups" : [
+    {
+      "layers" : [
+        { "image-name" : "prohibited.svg", "name" : "prohibited", "glass" : true, "position" : { "scale" : 34, "translation-in-points" : [ 0, 0 ] } },
+        { "image-name" : "keyboard.svg", "name" : "keyboard", "glass" : false, "position" : { "scale" : 21, "translation-in-points" : [ 0, 0 ] } }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : true, "value" : 0.4 }
+    }
+  ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}

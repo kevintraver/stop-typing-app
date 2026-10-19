@@ -1,4 +1,6 @@
-build
-StopTyping.iconset
-icons
-keyboard-icon.svg
+.DS_Store
+build/
+xcuserdata/
+StopTyping.xcodeproj/
+StopTypingCore/.build/
+StopTypingCore/.swiftpm/
