@@ -22,6 +22,8 @@ public struct DetectorConfiguration: Equatable, Sendable, Codable {
     // A burst reads like prose when it has word breaks, a variety of letters, and is mostly letters.
     // This keeps Vim motions (`jjjj`), held keys, URLs and symbol-heavy code from counting.
     public var minimumWordBreaks = 2
+    /// How many of `KeyCounts`' 16 letter buckets a burst has to touch. The name predates the
+    /// buckets and is kept so saved settings still decode.
     public var minimumDistinctLetters = 5
     public var minimumLetterRatio = 0.6
 
@@ -62,8 +64,8 @@ public struct TypingDetector: Sendable {
         case .escape:
             burst = nil
             return Outcome()
-        case .text(let text):
-            return registerText(text, at: time)
+        case .text(let counts):
+            return registerText(counts, at: time)
         }
     }
 
@@ -78,13 +80,13 @@ public struct TypingDetector: Sendable {
         lastNudge = (.stop, time)
     }
 
-    private mutating func registerText(_ text: String, at time: TimeInterval) -> Outcome {
+    private mutating func registerText(_ counts: KeyCounts, at time: TimeInterval) -> Outcome {
         if let burst, burst.hasEnded(at: time, configuration) {
             self.burst = nil
         }
 
         var burst = self.burst ?? Burst(start: time)
-        let added = burst.append(text, at: time)
+        let added = burst.append(counts, at: time)
         guard added > 0 else { return Outcome() }
 
         var outcome = Outcome()
@@ -129,7 +131,7 @@ private struct Burst: Sendable {
     var length = 0
     var letters = 0
     var wordBreaks = 0
-    var distinctLetters: Set<Character> = []
+    var letterBuckets: UInt16 = 0
     var countedAsProse = false
     var wasNudged = false
 
@@ -138,26 +140,15 @@ private struct Burst: Sendable {
         self.lastKey = start
     }
 
-    /// Adds the countable characters in `text` and returns how many were counted.
-    /// Arrow, function and delete keys produce control or private-use characters and are skipped.
-    mutating func append(_ text: String, at time: TimeInterval) -> Int {
-        var added = 0
-        for character in text {
-            if character.isLetter {
-                letters += 1
-                distinctLetters.insert(Character(character.lowercased()))
-            } else if character.isWhitespace {
-                wordBreaks += 1
-            } else if !character.isNumber && !character.isPunctuation {
-                continue
-            }
-            added += 1
-        }
-        if added > 0 {
-            length += added
-            lastKey = time
-        }
-        return added
+    /// Adds a key press's counts and returns how many characters it added.
+    mutating func append(_ counts: KeyCounts, at time: TimeInterval) -> Int {
+        guard counts.total > 0 else { return 0 }
+        length += counts.total
+        letters += counts.letters
+        wordBreaks += counts.wordBreaks
+        letterBuckets |= counts.letterBuckets
+        lastKey = time
+        return counts.total
     }
 
     func hasEnded(at time: TimeInterval, _ configuration: DetectorConfiguration) -> Bool {
@@ -169,7 +160,7 @@ private struct Burst: Sendable {
     func isProse(_ configuration: DetectorConfiguration) -> Bool {
         length >= configuration.sentenceLength
             && wordBreaks >= configuration.minimumWordBreaks
-            && distinctLetters.count >= configuration.minimumDistinctLetters
+            && letterBuckets.nonzeroBitCount >= configuration.minimumDistinctLetters
             && Double(letters) / Double(length) >= configuration.minimumLetterRatio
     }
 

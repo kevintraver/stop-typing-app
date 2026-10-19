@@ -13,7 +13,7 @@ private func type(
     var prose = 0
     var time = start
     for character in text {
-        let outcome = detector.register(.text(String(character)), at: time)
+        let outcome = detector.register(.text(KeyCounts(String(character))), at: time)
         if let nudge = outcome.nudge { nudges.append((nudge, time)) }
         prose += outcome.newProseCharacters
         time += interval
@@ -216,8 +216,23 @@ struct TypingDetectorTests {
         let words = ["Ça ", "fait ", "très ", "longtemps ", "que ", "je ", "n'écris ", "pas"]
         var nudges: [Nudge] = []
         for (index, word) in words.enumerated() {
-            if let nudge = detector.register(.text(word), at: Double(index)).nudge { nudges.append(nudge) }
+            if let nudge = detector.register(.text(KeyCounts(word)), at: Double(index)).nudge { nudges.append(nudge) }
         }
         #expect(nudges == [.gentle])
+    }
+
+    @Test func keyCountsKeepOnlyCoarseLetterBuckets() {
+        // a (0x61) and q (0x71) share a bucket, so the mask can't say which of them was typed.
+        #expect(KeyCounts("a").letterBuckets == KeyCounts("q").letterBuckets)
+        #expect(KeyCounts("A").letterBuckets == KeyCounts("a").letterBuckets)
+        #expect(KeyCounts("jjkkhhll").letterBuckets.nonzeroBitCount == 4)
+    }
+
+    @Test func keyCountsClassifyWithoutKeepingText() {
+        let counts = KeyCounts("Hi, 2 you!")
+        #expect(counts.letters == 5)
+        #expect(counts.wordBreaks == 2)
+        #expect(counts.others == 3)
+        #expect(KeyCounts("\u{F700}=+").total == 0) // an arrow key and symbols don't count
     }
 }

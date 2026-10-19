@@ -115,7 +115,10 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
 }
 
 private extension Keystroke {
-    /// Classifies a key-down event. Returns nil for auto-repeat and keys that produce no characters.
+    /// Classifies a key-down event. Returns nil for auto-repeat and keys that produce nothing countable.
+    ///
+    /// This is the only place a typed character exists: it's read into a local buffer, turned into
+    /// `KeyCounts`, and dropped when this initializer returns. Only the counts go on to the detector.
     init?(_ event: CGEvent) {
         guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return nil }
 
@@ -131,7 +134,8 @@ private extension Keystroke {
         var length = 0
         var characters = [UniChar](repeating: 0, count: 4)
         event.keyboardGetUnicodeString(maxStringLength: characters.count, actualStringLength: &length, unicodeString: &characters)
-        guard length > 0 else { return nil }
-        self = .text(String(utf16CodeUnits: characters, count: length))
+        let counts = KeyCounts(String(utf16CodeUnits: characters, count: length))
+        guard counts.total > 0 else { return nil }
+        self = .text(counts)
     }
 }
