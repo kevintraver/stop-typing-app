@@ -4,3 +4,4 @@ xcuserdata/
 StopTyping.xcodeproj/
 StopTypingCore/.build/
 StopTypingCore/.swiftpm/
+dist/

@@ -6,7 +6,7 @@ APP = $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 INSTALL_DIR = $(HOME)/Applications
 INSTALLED_APP = $(INSTALL_DIR)/$(APP_NAME).app
 
-.PHONY: all project build test install run clean
+.PHONY: all project build test install run release publish clean
 
 all: build
 
@@ -31,5 +31,13 @@ run: install
 	while pgrep -qx "$(APP_NAME)"; do sleep 0.2; done
 	open "$(INSTALLED_APP)"
 
+# Builds dist/ (DMG, Sparkle zip and appcast). Falls back to a clearly marked test build without Developer ID.
+release:
+	scripts/release.sh
+
+# Also creates the GitHub release and updates the Homebrew cask. Only ever run on purpose.
+publish:
+	scripts/release.sh publish
+
 clean:
-	rm -rf $(DERIVED_DATA) StopTyping.xcodeproj
+	rm -rf $(DERIVED_DATA) StopTyping.xcodeproj dist
