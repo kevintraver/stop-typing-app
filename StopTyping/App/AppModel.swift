@@ -366,6 +366,9 @@ final class AppModel {
             inputGeneration = keystroke.generation
         }
 
+        // Esc already abandons the burst in the detector; it also clears a nudge that's showing.
+        if keystroke.keystroke == .escape { hud.dismiss() }
+
         detector.configuration = preferences.detection
         detector.usesStopWindow = preferences.stopsWhenIgnored
         detector.isQuiet = preferences.isQuietDuringFocus && focus.isFocused

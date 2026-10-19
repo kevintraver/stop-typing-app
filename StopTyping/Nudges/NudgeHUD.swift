@@ -28,8 +28,8 @@ extension Nudge {
     }
 }
 
-/// A short-lived, click-through overlay near the top of the screen the pointer is on.
-/// It never takes focus, so it can't interrupt what's being typed.
+/// A short-lived overlay near the top of the screen you're typing on. It never takes focus, so it
+/// can't interrupt what's being typed. It fades on its own, or goes at once with Esc, a click, or its ✕.
 @MainActor
 final class NudgeHUD {
     /// Where the top of the nudge sits below the menu bar until the user drags it somewhere else.
@@ -40,6 +40,8 @@ final class NudgeHUD {
     private var dismissal: Task<Void, Never>?
     /// True while the HUD positions the panel itself, so only the user's drags are saved.
     private var isPositioning = false
+    /// When the user last dragged the nudge, so the click that ends a drag doesn't also dismiss it.
+    private var lastDragged: ContinuousClock.Instant?
     private var animates: Bool { !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     init(preferences: Preferences) {
@@ -47,9 +49,12 @@ final class NudgeHUD {
     }
 
     func show(_ nudge: Nudge) {
-        let host = NSHostingView(rootView: NudgeView(nudge: nudge) { [weak self] hovering in
-            self?.hoverChanged(hovering, nudge: nudge)
-        })
+        let host = NSHostingView(rootView: NudgeView(
+            nudge: nudge,
+            onHover: { [weak self] hovering in self?.hoverChanged(hovering, nudge: nudge) },
+            onClick: { [weak self] in self?.clicked() },
+            onDismiss: { [weak self] in self?.dismiss() }
+        ))
         panel.contentView = host
         panel.setContentSize(host.fittingSize)
 
@@ -69,6 +74,24 @@ final class NudgeHUD {
             panel.orderFrontRegardless()
         }
         scheduleDismissal(after: nudge == .gentle ? .seconds(3.5) : .seconds(5), fadeIn: true)
+    }
+
+    /// Hides the nudge now, if it's showing.
+    func dismiss() {
+        guard panel.isVisible else { return }
+        dismissal?.cancel()
+        dismissal = Task {
+            await fade(to: 0)
+            guard !Task.isCancelled else { return }
+            panel.orderOut(nil)
+        }
+    }
+
+    /// A drag moves the window under the pointer, so it ends looking like a click. Only a click
+    /// that didn't just finish a drag dismisses.
+    private func clicked() {
+        if let lastDragged, ContinuousClock.now - lastDragged < .milliseconds(400) { return }
+        dismiss()
     }
 
     /// Hovering, and so dragging, keeps the nudge on screen; leaving it starts a short countdown.
@@ -106,6 +129,7 @@ final class NudgeHUD {
 
     private func panelMoved() {
         guard !isPositioning, let visible = panel.screen?.visibleFrame else { return }
+        lastDragged = .now
         preferences.nudgeOffset = CGSize(
             width: panel.frame.midX - visible.midX,
             height: visible.maxY - panel.frame.maxY
@@ -138,10 +162,15 @@ final class NudgeHUD {
     }
 }
 
-/// The nudge capsule. It can be dragged anywhere; clicks on the transparent margin pass through.
+/// The nudge capsule. Drag it anywhere, click it or its ✕ to dismiss; clicks on the transparent
+/// margin pass through.
 private struct NudgeView: View {
     let nudge: Nudge
     let onHover: (Bool) -> Void
+    let onClick: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -156,6 +185,18 @@ private struct NudgeView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            // Always laid out so the capsule doesn't change size when the ✕ appears on hover.
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -163,12 +204,18 @@ private struct NudgeView: View {
         .overlay(Capsule().strokeBorder(.separator))
         .contentShape(.capsule)
         .gesture(WindowDragGesture())
+        .simultaneousGesture(TapGesture().onEnded(onClick))
         .allowsWindowActivationEvents(true)
-        .onHover(perform: onHover)
+        .onHover { hovering in
+            isHovered = hovering
+            onHover(hovering)
+        }
+        .animation(.easeOut(duration: 0.15), value: isHovered)
         .pointerStyle(.grabIdle)
         .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
         .padding(24)
         .fixedSize()
         .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Dismiss", onDismiss)
     }
 }
