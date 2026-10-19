@@ -24,8 +24,10 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
 
     private func makeWindow(model: AppModel) -> NSWindow {
         let controller = NSHostingController(rootView: OnboardingView().environment(model))
-        // Lets the window grow when a row adds a line, such as the hint that notifications are turned off.
-        controller.sizingOptions = .preferredContentSize
+        // Sized once from the content below. Letting the hosting controller resize the window
+        // (`.preferredContentSize`) fed back into the transparent titlebar's layout and looped until
+        // AppKit aborted with "more Update Constraints in Window passes than there are views".
+        controller.sizingOptions = []
         let window = NSWindow(contentViewController: controller)
         window.styleMask = [.titled, .closable]
         window.title = String(localized: "Set Up Stop Typing App")
