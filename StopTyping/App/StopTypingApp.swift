@@ -18,6 +18,7 @@ struct StopTypingApp: App {
         Settings {
             SettingsView()
                 .environment(appDelegate.model)
+                .environment(appDelegate.updater)
         }
     }
 }
@@ -25,6 +26,7 @@ struct StopTypingApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
+    let updater = Updater()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()

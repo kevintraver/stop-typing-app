@@ -102,8 +102,34 @@ private struct GeneralSettings: View {
                 Text("Stop Typing App only counts characters to tell prose from shortcuts. It never stores or sends what you type.")
                     .foregroundStyle(.secondary)
             }
+
+            UpdatesSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct UpdatesSection: View {
+    @Environment(Updater.self) private var updater
+
+    var body: some View {
+        @Bindable var updater = updater
+        Section {
+            Toggle(isOn: $updater.automaticallyChecksForUpdates) {
+                Text("Check for updates automatically")
+                if !updater.isAvailable {
+                    Text("Development builds don't update themselves.")
+                }
+            }
+            .disabled(!updater.isAvailable)
+        } header: {
+            Text("Updates")
+        } footer: {
+            SectionActions {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+            }
+        }
     }
 }
 
