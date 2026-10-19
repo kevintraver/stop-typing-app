@@ -28,5 +28,15 @@
 	<string>Stop Typing App stays quiet while a Focus like Do Not Disturb is on.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Kevin Traver</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableDownloaderService</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/$(GITHUB_REPO)/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_KEY)</string>
 </dict>
 </plist>

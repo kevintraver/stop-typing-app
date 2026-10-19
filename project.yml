@@ -9,6 +9,10 @@ options:
 packages:
   StopTypingCore:
     path: StopTypingCore
+  # Pinned to an exact release so every build embeds the same, known framework and XPC services.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.4
 
 settings:
   base:
@@ -30,6 +34,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: StopTypingCore
+      - package: Sparkle
     info:
       path: StopTyping/Info.plist
       properties:
@@ -40,6 +45,16 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: "© 2026 Kevin Traver"
         NSFocusStatusUsageDescription: Stop Typing App stays quiet while a Focus like Do Not Disturb is on.
+        # Sparkle. The appcast is attached to every GitHub release, so "latest" always points at the newest one.
+        SUFeedURL: https://github.com/$(GITHUB_REPO)/releases/latest/download/appcast.xml
+        # Empty in development builds, which keeps the updater from starting (see Updater.swift).
+        # scripts/release.sh fills it in from the EdDSA key in the keychain.
+        SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        SUEnableAutomaticChecks: true
+        # A sandboxed app can't replace itself, so Sparkle's Installer XPC service does it from outside the sandbox.
+        SUEnableInstallerLauncherService: true
+        # The app has no network entitlement, so Sparkle's Downloader XPC service fetches the appcast and updates.
+        SUEnableDownloaderService: true
     entitlements:
       path: StopTyping/StopTyping.entitlements
       properties:
@@ -48,6 +63,11 @@ targets:
         com.apple.security.app-sandbox: true
         # Lets the Ignore tab read the .app bundles the user picks in the open panel, to get their bundle IDs.
         com.apple.security.files.user-selected.read-only: true
+        # Lets the sandboxed app reach Sparkle's installer, which listens on these two Mach services
+        # (status and installer connections). Required by Sparkle's sandboxing guide.
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
     settings:
       base:
         PRODUCT_NAME: Stop Typing App
@@ -55,6 +75,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.kevintraver.StopTyping
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        # Where releases (and Sparkle's appcast) are published. scripts/release.sh passes its own GITHUB_REPO.
+        GITHUB_REPO: kevintraver/stop-typing-app
+        # Sparkle's EdDSA public key. Never commit one here; scripts/release.sh injects it.
+        SPARKLE_PUBLIC_KEY: ""
         # Notarization requires the hardened runtime on every signed binary.
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Manual
