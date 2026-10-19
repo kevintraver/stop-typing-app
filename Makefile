@@ -9,6 +9,7 @@ MACOS_DIR = $(CONTENTS_DIR)/MacOS
 RESOURCES_DIR = $(CONTENTS_DIR)/Resources
 EXECUTABLE = keylogger
 TARGET = $(MACOS_DIR)/$(EXECUTABLE)
+ICONSET_DIR = StopTyping.iconset
 
 all: app
 
@@ -39,6 +40,35 @@ $(CONTENTS_DIR)/Info.plist: Info.plist | $(CONTENTS_DIR)
 
 $(RESOURCES_DIR)/StopTyping.icns: StopTyping.icns | $(RESOURCES_DIR)
 	cp StopTyping.icns $@
+
+# --- Icon build pipeline ---
+# Provide keyboard-off.svg at repo root; we generate StopTyping.icns from it.
+ICON_SVG = keyboard-off.svg
+SVG2PNG = $(BUILD_DIR)/svg2png
+
+StopTyping.icns: $(ICON_SVG) $(SVG2PNG)
+	@echo "Generating .iconset from $(ICON_SVG)"
+	rm -rf $(ICONSET_DIR)
+	mkdir -p $(ICONSET_DIR)
+	# Render a crisp 1024x1024 master PNG via WebKit
+	$(SVG2PNG) $(ICON_SVG) $(ICONSET_DIR)/icon_512x512@2x.png 1024 || (echo "svg2png failed" && exit 1)
+	# Downscale to required sizes
+	sips -Z 512 $(ICONSET_DIR)/icon_512x512@2x.png --out $(ICONSET_DIR)/icon_512x512.png >/dev/null
+	sips -Z 256 $(ICONSET_DIR)/icon_512x512@2x.png --out $(ICONSET_DIR)/icon_256x256.png >/dev/null
+	cp $(ICONSET_DIR)/icon_256x256.png $(ICONSET_DIR)/icon_128x128@2x.png
+	sips -Z 128 $(ICONSET_DIR)/icon_256x256.png --out $(ICONSET_DIR)/icon_128x128.png >/dev/null
+	sips -Z 64  $(ICONSET_DIR)/icon_128x128.png --out $(ICONSET_DIR)/icon_32x32@2x.png >/dev/null
+	sips -Z 32  $(ICONSET_DIR)/icon_32x32@2x.png  --out $(ICONSET_DIR)/icon_32x32.png >/dev/null
+	sips -Z 16  $(ICONSET_DIR)/icon_32x32.png    --out $(ICONSET_DIR)/icon_16x16.png >/dev/null
+	cp $(ICONSET_DIR)/icon_32x32.png $(ICONSET_DIR)/icon_16x16@2x.png
+	cp $(ICONSET_DIR)/icon_512x512@2x.png $(ICONSET_DIR)/icon_256x256@2x.png
+
+	@echo "Building StopTyping.icns"
+	iconutil -c icns $(ICONSET_DIR) -o StopTyping.icns
+	@echo "Created StopTyping.icns"
+
+$(SVG2PNG): tools/svg2png.m | $(BUILD_DIR)
+	$(CC) -fobjc-arc -framework Foundation -framework WebKit -framework AppKit tools/svg2png.m -o $(SVG2PNG)
 
 $(MACOS_DIR):
 	mkdir -p $(MACOS_DIR)
