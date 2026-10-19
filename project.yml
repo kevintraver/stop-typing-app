@@ -13,6 +13,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    # The single source of the app's version: Info.plist and scripts/release.sh both read these.
     MARKETING_VERSION: "2.0"
     CURRENT_PROJECT_VERSION: "1"
 
@@ -33,6 +34,8 @@ targets:
       path: StopTyping/Info.plist
       properties:
         CFBundleDisplayName: Stop Typing App
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: "© 2026 Kevin Traver"
@@ -40,7 +43,10 @@ targets:
     entitlements:
       path: StopTyping/StopTyping.entitlements
       properties:
+        # Sandboxed so the app can only reach what it needs; it has no network or file access of its own.
+        # Input Monitoring is a TCC permission the user grants, not an entitlement.
         com.apple.security.app-sandbox: true
+        # Lets the Ignore tab read the .app bundles the user picks in the open panel, to get their bundle IDs.
         com.apple.security.files.user-selected.read-only: true
     settings:
       base:
@@ -49,8 +55,17 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.kevintraver.StopTyping
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        # Notarization requires the hardened runtime on every signed binary.
         ENABLE_HARDENED_RUNTIME: YES
-        # A stable signing identity keeps macOS's Input Monitoring grant across rebuilds.
         CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: Apple Development
         DEVELOPMENT_TEAM: 8EDDZ23NT2
+      configs:
+        Debug:
+          # A stable signing identity keeps macOS's Input Monitoring grant across rebuilds.
+          CODE_SIGN_IDENTITY: Apple Development
+        Release:
+          # Release builds are distributed outside the App Store, so they're signed with Developer ID
+          # and a secure timestamp, both of which notarization requires. scripts/release.sh overrides
+          # the identity when no Developer ID certificate is installed yet.
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
