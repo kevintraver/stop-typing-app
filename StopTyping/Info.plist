@@ -29,7 +29,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Kevin Traver</string>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUEnableDownloaderService</key>
 	<true/>
 	<key>SUEnableInstallerLauncherService</key>

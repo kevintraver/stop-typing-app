@@ -16,6 +16,10 @@ struct OnboardingView: View {
                 NotificationsRow()
                 Divider()
                 FocusRow()
+                if model.updater.isAvailable {
+                    Divider()
+                    UpdatesRow()
+                }
             }
             .background(.quinary, in: .rect(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
@@ -130,6 +134,25 @@ private struct FocusRow: View {
             detail: "Stays quiet during Do Not Disturb and other Focuses."
         ) {
             Toggle("Stay quiet during Focus", isOn: $model.isQuietDuringFocus)
+                .toggleStyle(.switch)
+                .labelsHidden()
+        }
+    }
+}
+
+/// Off until the user turns it on, so out of the box the app makes no network connections.
+private struct UpdatesRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var updater = model.updater
+        ChecklistRow(
+            isDone: updater.automaticallyChecksForUpdates,
+            title: "Automatic Updates",
+            badge: "Optional",
+            detail: "Asks GitHub once a day for a new version, sending only the app's version number. Off means no network connections at all."
+        ) {
+            Toggle("Check for updates automatically", isOn: $updater.automaticallyChecksForUpdates)
                 .toggleStyle(.switch)
                 .labelsHidden()
         }

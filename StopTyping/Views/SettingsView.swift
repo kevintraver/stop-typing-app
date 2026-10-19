@@ -122,7 +122,9 @@ private struct UpdatesSection: View {
         Section {
             Toggle(isOn: $updater.automaticallyChecksForUpdates) {
                 Text("Check for updates automatically")
-                if !updater.isAvailable {
+                if updater.isAvailable {
+                    Text("Off by default. When on, the app asks GitHub once a day for a new version, sending only its version number. Off, it makes no network connections at all.")
+                } else {
                     Text("Development builds don't update themselves.")
                 }
             }

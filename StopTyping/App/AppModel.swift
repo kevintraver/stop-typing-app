@@ -19,6 +19,7 @@ final class AppModel {
     }
 
     let preferences: Preferences
+    let updater = Updater()
     private(set) var tapState = TapState.stopped
     /// The app most recently brought to the front, other than this one. Offered as a quick exclusion.
     private(set) var recentApp: AppInfo?

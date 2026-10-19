@@ -50,7 +50,9 @@ targets:
         # Empty in development builds, which keeps the updater from starting (see Updater.swift).
         # scripts/release.sh fills it in from the EdDSA key in the keychain.
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
-        SUEnableAutomaticChecks: true
+        # Off until the user opts in (setup window or Settings), so out of the box the app makes no
+        # network connections at all, as the site promises. Set explicitly so Sparkle never asks on its own.
+        SUEnableAutomaticChecks: false
         # A sandboxed app can't replace itself, so Sparkle's Installer XPC service does it from outside the sandbox.
         SUEnableInstallerLauncherService: true
         # The app has no network entitlement, so Sparkle's Downloader XPC service fetches the appcast and updates.
