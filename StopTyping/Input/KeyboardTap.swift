@@ -12,7 +12,7 @@ struct TimedKeystroke: Sendable {
 enum KeyboardTapError: Error {
     /// Input Monitoring hasn't been granted.
     case permissionDenied
-    /// Permission is granted but the system refused the tap; usually fixed by relaunching.
+    /// Permission is granted but the system refused the tap anyway; usually fixed by relaunching.
     case unavailable
 }
 
@@ -30,6 +30,8 @@ enum KeyboardTap {
 
     /// Starts the tap. It stops when the stream's consumer goes away.
     static func keystrokes() throws(KeyboardTapError) -> AsyncStream<TimedKeystroke> {
+        // A tap created before Input Monitoring is granted never receives keys, even after the grant,
+        // so wait for the grant rather than create one that would stay deaf.
         guard hasPermission else { throw .permissionDenied }
 
         let (stream, continuation) = AsyncStream.makeStream(

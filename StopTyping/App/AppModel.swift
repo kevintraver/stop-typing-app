@@ -13,7 +13,7 @@ final class AppModel {
     enum Status: Equatable {
         case off
         case needsPermission
-        /// Permission is granted but the system refused the tap. A relaunch fixes it.
+        /// Permission is granted but the system refused the tap even so. A relaunch fixes it.
         case unavailable
         case snoozed(until: Date)
         case listening
@@ -95,7 +95,8 @@ final class AppModel {
         }
     }
 
-    var hasInputMonitoringPermission: Bool { KeyboardTap.hasPermission }
+    /// Kept current by `refreshPermission()`, so views watching it see a grant made in System Settings.
+    private(set) var hasInputMonitoringPermission = KeyboardTap.hasPermission
 
     var isQuietDuringFocus: Bool {
         get { preferences.isQuietDuringFocus }
@@ -108,6 +109,7 @@ final class AppModel {
     func start() {
         if let until = preferences.snoozedUntil { scheduleSnoozeExpiry(at: until) }
         trackFrontmostApp()
+        refreshPermissionOnActivation()
         if preferences.isQuietDuringFocus { focus.start() }
         if preferences.isEnabled && !KeyboardTap.hasPermission {
             KeyboardTap.requestPermission()
@@ -268,17 +270,41 @@ final class AppModel {
         tapState = .stopped
     }
 
-    /// Input Monitoring is granted in System Settings, which doesn't tell the app, and the grant
-    /// only takes effect in a new process. Check until it's on, then relaunch.
+    /// Re-reads Input Monitoring and, once it's granted, starts the tap in this process.
+    ///
+    /// A listen-only tap created before the grant never receives keys, and macOS doesn't upgrade it,
+    /// but one created after the grant works without a relaunch. `KeyboardTap` refuses to create a tap
+    /// until the grant, so there's never a stale one to replace. If the system still refuses the tap,
+    /// the status becomes `.unavailable` and the menu bar panel offers a relaunch.
+    func refreshPermission() {
+        let granted = KeyboardTap.hasPermission
+        if granted != hasInputMonitoringPermission { hasInputMonitoringPermission = granted }
+        guard granted, tapState == .needsPermission else { return }
+        log.notice("Input Monitoring granted: starting the tap without relaunching")
+        permissionPolling?.cancel()
+        permissionPolling = nil
+        updateListening()
+    }
+
+    /// Opening the menu bar panel or Settings activates the app, so they show a grant made while paused,
+    /// when nothing is polling.
+    private func refreshPermissionOnActivation() {
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshPermission() }
+        }
+    }
+
+    /// Input Monitoring is granted in System Settings, which doesn't tell the app, so check until it's on.
     private func pollForPermission() {
         guard permissionPolling == nil else { return }
         permissionPolling = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
-                if KeyboardTap.hasPermission {
-                    relaunch()
-                    return
-                }
+                refreshPermission()
             }
         }
     }
