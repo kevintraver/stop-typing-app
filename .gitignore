@@ -5,3 +5,4 @@ StopTyping.xcodeproj/
 StopTypingCore/.build/
 StopTypingCore/.swiftpm/
 dist/
+.claude/worktrees/
