@@ -1,140 +1,54 @@
-# Keyboard Tracking and Typing Monitor for macOS
+# Stop Typing App
 
-A tool inspired by "Vim Hardtime" that detects when you're typing too much text and encourages using keyboard shortcuts instead. This application monitors keyboard activity and warns you when you've typed too many consecutive characters without using shortcuts.
+A macOS menu bar app that notices when you're typing out prose by hand and nudges you to dictate it instead.
+
+It watches for bursts of typing that read like sentences (several words, mostly letters) and shows a small on-screen nudge. Keep typing a whole paragraph and it nudges more firmly. Shortcuts, held keys, Vim motions and code-like text don't count.
 
 ## Features
 
-- Real-time keyboard monitoring using macOS Core Graphics Event Tap
-- Warns you when typing too many consecutive characters
-- Provides audible and visual warnings through system notifications
-- Resets count when using keyboard shortcuts or special keys
-- Includes a cooldown timer to reset after periods of inactivity
-- Runs in the background with a simple menu bar icon
+- **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks, 5 different letters and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
+- **Quiet by default.** After a nudge, new bursts wait 2 minutes before the next gentle nudge. A 5 second pause (2.5 s for very short bursts) or Escape ends a burst. All of this is adjustable in Settings → Detection.
+- **On-screen nudge** that never takes focus. Drag it anywhere; it remembers the spot. It appears on the screen you're typing on.
+- **Notification Center (optional)** gets the first nudge of each round, never the follow-ups.
+- **Stop window (opt-in).** Replaces the firm nudge: keep typing after the first nudge and, once the "time to switch to dictation" (30 s by default) has passed, a centered window takes focus until you click Got It, Snooze 15 Minutes or Ignore <App>. Its buttons have no keyboard shortcuts, so typing can't dismiss it. After Got It it stays quiet for a full "wait between nudges", then starts over. In full-screen apps it shows the on-screen nudge instead (adjustable).
+- **Quiet during Focus.** No nudges at all while Do Not Disturb or another Focus is on (adjustable).
+- **Per-app exclusions** for terminals, editors and games, with a one-click toggle for the last app you used.
+- **Snooze** for 15 minutes, an hour, or until tomorrow.
+- **Today's stats:** nudges and an estimate of words typed.
+- **Open at login.**
 
-## How It Works
+## Privacy
 
-1. The app counts consecutive character keystrokes as you type
-2. When you reach the character threshold (default: 5 characters), it shows a warning
-3. Using keyboard shortcuts (Cmd/Ctrl/Alt + any key) or pressing Enter/Escape/etc. resets the counter
-4. A pause in typing also resets the counter after the cooldown period
+Stop Typing App uses a *listen-only* event tap, so it can observe key presses but never delay, change or block them. Each key is turned into a count the moment it arrives; characters are never stored, logged or sent anywhere. Password fields are invisible to it because macOS hides keystrokes while secure input is on. The app is sandboxed and makes no network connections.
 
-## Technical Details
-
-This application demonstrates how to:
-
-1. **Hook into macOS keyboard events** using Core Graphics Event Tap
-2. **Process keyboard events** in real-time
-3. **Filter and categorize keys** (characters, modifiers, special keys)
-4. **Handle key repeat** properly (counting each key only once while held)
-5. **Detect keyboard shortcuts** by checking modifier flags
+It needs **Input Monitoring** permission (System Settings → Privacy & Security → Input Monitoring). macOS asks the first time you launch it.
 
 ## Requirements
 
-- macOS 10.10 or later
-- Xcode Command Line Tools (for compilation)
-- Accessibility permissions (required to monitor keyboard events)
+- macOS 15 or later
+- Xcode 26 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
-## Building and Running
+## Building
 
-1. Navigate to the project directory:
-    ```
-    cd ~/code/macos_keylogger
-    ```
+```sh
+make run    # generate the project, build, and launch
+make test   # run the detection tests
+make build  # build only; the app lands in build/Build/Products/Debug
+```
 
-2. Compile the application:
-    ```
-    make
-    ```
+The Xcode project is generated from `project.yml`, so edit that rather than the `.xcodeproj` (which isn't checked in). Run `make project` and open `StopTyping.xcodeproj` to work in Xcode.
 
-3. **Run from the app bundle (recommended for full functionality):**
-    ```
-    make run-app
-    ```
-    This runs the app from its proper .app bundle, enabling notifications.
+Builds are signed with an Apple Development certificate so macOS keeps the Input Monitoring permission between builds. To build with a different account, change `DEVELOPMENT_TEAM` in `project.yml`.
 
-4. **Alternative: Run development binary:**
-    ```
-    make run-dev
-    ```
-    ⚠️ **Warning:** Running as a standalone executable disables notifications. Use this only for development/testing.
+## Layout
 
-5. Grant accessibility permissions when prompted
-6. The app will show a "KM" icon in your menu bar and start monitoring your typing
+| Path | What's there |
+|---|---|
+| `StopTypingCore/` | Swift package with the detection logic and daily stats. No system frameworks, fully unit tested. |
+| `StopTyping/Input/KeyboardTap.swift` | The listen-only event tap, on its own thread, delivered as an `AsyncStream`. |
+| `StopTyping/App/` | App entry point, `AppModel` (connects everything) and `Preferences`. |
+| `StopTyping/Nudges/` | The on-screen nudge and notifications. |
+| `StopTyping/Views/` | The menu bar panel and Settings window. |
+| `StopTyping/Resources/` | The Icon Composer app icon and the menu bar asset. |
 
-## Troubleshooting
-
-### Notifications Not Working
-- **Problem:** No notifications appear when typing threshold is reached
-- **Solution:** Make sure you're running from the .app bundle (`make run-app`), not the dev binary
-- **Check:** System Settings → Notifications → StopTyping should be enabled
-
-### App Won't Start
-- **Problem:** App crashes on launch
-- **Solution:** Ensure Accessibility permissions are granted in System Settings → Privacy & Security → Accessibility
-- **Alternative:** Run `make run-app` to launch from Finder if the terminal method fails
-
-### No Menu Bar Icon
-- **Problem:** App runs but no icon appears in menu bar
-- **Solution:** Check the console output for error messages, ensure proper permissions are granted
-
-## Configuration
-
-You can modify these in `src/KeyboardMonitor.m` or surface a UI later:
-
-- `maxConsecutiveChars`: The number of consecutive characters before showing a warning (default: 15)
-- `typingCooldownMs`: Time in milliseconds of inactivity before resetting the counter (default: 3000)
-
-## Implementation Notes
-
-This project takes inspiration from the keyboard tracking in espanso:
-
-### Architecture Overview
-
-The core architecture consists of:
-
-1. **Event Tap Setup**: Uses Core Graphics Event Tap to hook into system keyboard events
-2. **Event Callback**: Processes keyboard events to track consecutive typing
-3. **Key Dictionary**: Prevents double-counting keys when held down
-4. **Warning System**: Shows a notification when the threshold is reached
-
-### How Events Are Processed
-
-1. **Key Press Detection**: Captures key down, key up, and modifier change events
-2. **Character Extraction**: Gets Unicode characters from keyboard events
-3. **Modifier Flag Checking**: Detects keyboard shortcuts by checking modifier flags
-4. **Tracking Consecutive Characters**: Counts only printable characters, not control keys
-5. **Warning Trigger**: Shows a warning when the count exceeds the threshold
-
-### Native Integration
-
-- Uses Core Graphics for event capture
-- Uses NSNotification for system notifications
-- Uses NSBeep for audible warnings
-
-## Differences from espanso
-
-While this project was inspired by espanso's keyboard tracking, it differs in several ways:
-
-1. **Focused Purpose**: Specifically designed to warn about excessive typing
-2. **Simpler Implementation**: Single file implementation instead of a multi-platform structure
-3. **Native Notifications**: Uses macOS system notifications
-4. **Key Repeat Handling**: Custom tracking of key presses to handle keyboard repeat correctly
-5. **No Text Expansion**: Unlike espanso, this app just monitors typing patterns
-
-## Security and Privacy
-
-This application requires Accessibility permissions to monitor keyboard events. It:
-- Does not send any data over the network
-- Logs only operational status by default; it does not log characters
-- Keeps any ephemeral buffers in memory only
-
-## Acknowledgments
-
-- Inspired by Vim Hardtime concept
-- Keyboard event tracking approach inspired by espanso's implementation
-- Used espanso's source code as reference for macOS keyboard event handling
-
-## Notes
-
-- Uses `UserNotifications` (modern notifications) and ARC.
-- Status bar icon currently uses text; consider a template image asset for better dark-mode support.
+The keyboard-off glyph is from [Lucide](https://lucide.dev) (ISC license).
