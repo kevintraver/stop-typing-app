@@ -264,8 +264,11 @@ fi
 echo "==> Publishing v${VERSION} to ${GITHUB_REPO}"
 # The appcast rides along on every release, so .../releases/latest/download/appcast.xml (the app's
 # SUFeedURL) always serves the newest one. The tag points at the commit that was built, so push it first.
+# Hand-written notes in docs/releases/<version>.md when there are any; otherwise GitHub generates them.
+NOTES_FILE="${REPO_DIR}/docs/releases/${VERSION}.md"
+if [[ -f "${NOTES_FILE}" ]]; then NOTES=(--notes-file "${NOTES_FILE}"); else NOTES=(--generate-notes); fi
 gh release create "v${VERSION}" --repo "${GITHUB_REPO}" --target "$(git rev-parse HEAD)" \
-  --title "${APP_NAME} ${VERSION}" --generate-notes \
+  --title "${APP_NAME} ${VERSION}" "${NOTES[@]}" \
   "${DMG}" "${LATEST_DMG}" "${ZIP}" "${APPCAST}"
 
 "${REPO_DIR}/scripts/update-cask.sh" "${VERSION}" "${SHA256}" ${TAP_DIR:+"${TAP_DIR}"}
