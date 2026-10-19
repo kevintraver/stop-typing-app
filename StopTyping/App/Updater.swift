@@ -31,6 +31,8 @@ final class Updater {
         automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
         guard isAvailable else { return }
 
+        // Override any older stored preference before the first possible request.
+        controller.updater.sendsSystemProfile = false
         controller.startUpdater()
         // Sparkle changes this on the main thread, where its KVO notifications are delivered too.
         canCheckObservation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in

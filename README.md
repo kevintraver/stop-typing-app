@@ -6,7 +6,7 @@ It watches for bursts of typing that read like sentences (several words, mostly 
 
 ## Features
 
-- **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks, 5 different letters and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
+- **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
 - **Quiet by default.** After a nudge, new bursts wait 2 minutes before the next gentle nudge. A 5 second pause (2.5 s for very short bursts) or Escape ends a burst. All of this is adjustable in Settings → Detection.
 - **On-screen nudge** that never takes focus. Drag it anywhere; it remembers the spot. It appears on the screen you're typing on.
 - **Notification Center (optional)** gets every nudge too, so you can find them later. The stop window isn't sent there.
@@ -26,11 +26,15 @@ On first launch a setup window walks through permissions. Only **Input Monitorin
 
 ## Privacy
 
-Stop Typing App uses a *listen-only* event tap, so it can observe key presses but never delay, change or block them. Each key is turned into a count the moment it arrives; characters are never stored, logged or sent anywhere. The app writes no logs at all. All it keeps, in its own sandboxed preferences, is your settings, your ignore list and today's two counts (nudges and an estimate of words typed). Password fields are invisible to it because macOS hides keystrokes while secure input is on.
+Stop Typing App uses a *listen-only* event tap: it cannot delay, change or block key presses. It briefly classifies input on your Mac as letters, word breaks or other characters. Only counts and timing leave the callback; typed text is not saved to disk, logged or sent anywhere. The input-monitoring code writes no logs and includes no analytics or crash-reporting service.
 
-The app is sandboxed and has no network access of its own, and by default it makes no network connections at all. If you turn on automatic update checks (off by default, in the setup window or Settings), Sparkle asks this repository's GitHub releases once a day for a newer version. That request carries the app's name and version, your language and, like any web request, your IP address; never anything you typed. Sparkle's downloader and installer helpers run outside the sandbox, as Sparkle ships them; the app that watches the keyboard never does.
+Preferences contain your settings, ignored app identifiers, and one day's aggregate prose-character and nudge counts. Expired counts are replaced at midnight while running, and on launch, wake, clock/timezone changes and app activation. The app cannot erase data while it is stopped or the Mac is asleep, or remove copies in system backups. Optional Notification Center nudges contain only fixed reminder text, but macOS retains their delivery time.
 
-While you're snoozed, typing in an ignored app, or looking at the stop window, keys aren't read at all. Otherwise each key is reduced, inside the event tap, to whether it was a letter, a word break or something else; nothing downstream can tell which key it was.
+The keyboard-monitoring process is sandboxed without network access. Automatic update checks are off by default. If you enable them or choose **Check for Updates**, Sparkle contacts GitHub and its download servers. Requests reveal your IP address, app and Sparkle versions, and request language, never typing or app-usage data. System profiling is explicitly disabled. Sparkle's downloader and installer run outside the app sandbox and can retain local diagnostics, update preferences, timestamps and downloaded files. macOS can also produce its own diagnostics; this is not a promise that the operating system writes no logs.
+
+Before decoding characters, the tap checks that an event is addressed to the currently allowed app. Snooze, ignored apps and the stop window close that boundary. Queued counts are invalidated when it changes. If macOS has not yet reported the new app, its input is dropped rather than attributed to the previous app.
+
+macOS suppresses keyboard events while **Secure Event Input** is enabled. Native secure fields normally enable it; custom fields depend on their application's implementation. Secrets entered into an ordinary text field can still be classified, so the app does not promise to recognize every password field.
 
 ## Requirements
 
