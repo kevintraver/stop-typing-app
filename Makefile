@@ -6,7 +6,7 @@ APP = $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 INSTALL_DIR = $(HOME)/Applications
 INSTALLED_APP = $(INSTALL_DIR)/$(APP_NAME).app
 
-.PHONY: all project build test test-core test-privacy install run release publish clean
+.PHONY: all project build test test-core test-privacy build-ios install-ios install run release publish clean
 
 all: build
 
@@ -17,7 +17,7 @@ build: project
 	xcodebuild -project StopTyping.xcodeproj -scheme StopTyping -configuration Debug \
 		-derivedDataPath $(DERIVED_DATA) -quiet build
 
-test: test-core test-privacy
+test: test-core test-privacy build-ios
 
 test-core:
 	swift test --package-path StopTypingCore
@@ -25,6 +25,19 @@ test-core:
 test-privacy: project
 	xcodebuild -project StopTyping.xcodeproj -scheme StopTyping -configuration Debug \
 		-destination 'platform=macOS,arch=arm64' -derivedDataPath $(DERIVED_DATA) -quiet test
+
+# The iPhone app and its keyboard, built for the Simulator so it needs no device or signing.
+build-ios: project
+	xcodebuild -project StopTyping.xcodeproj -scheme StopTypingiOS -destination 'generic/platform=iOS Simulator' \
+		-derivedDataPath $(DERIVED_DATA) -quiet build
+
+# Builds, signs and installs the iPhone app on a connected device: make install-ios IOS_DEVICE=<udid>
+# (`xcrun devicectl list devices` shows the identifier). Signing is automatic on team 8EDDZ23NT2.
+install-ios: project
+	xcodebuild -project StopTyping.xcodeproj -scheme StopTypingiOS -destination 'platform=iOS,id=$(IOS_DEVICE)' \
+		-derivedDataPath $(DERIVED_DATA)/ios-device -allowProvisioningUpdates -allowProvisioningDeviceRegistration -quiet build
+	xcrun devicectl device install app --device $(IOS_DEVICE) \
+		"$(DERIVED_DATA)/ios-device/Build/Products/Debug-iphoneos/StopTypingiOS.app"
 
 # Replaces the bundle rather than copying over it, so files removed from the app don't linger.
 install: build
