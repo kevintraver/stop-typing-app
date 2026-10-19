@@ -5,7 +5,7 @@ cask "stop-typing-app" do
   url "https://github.com/kevintraver/stop-typing-app/releases/download/v#{version}/StopTypingApp-#{version}.dmg"
   name "Stop Typing App"
   desc "Nudges you to dictate instead of typing out paragraphs"
-  homepage "https://github.com/kevintraver/stop-typing-app"
+  homepage "https://www.stoptypingapp.com/"
 
   livecheck do
     url :url
