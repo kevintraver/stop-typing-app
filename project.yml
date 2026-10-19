@@ -112,6 +112,83 @@ targets:
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
 
+  # iPhone: the app is a setup guide and settings; the keyboard extension is the product.
+  StopTypingiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: StopTypingiOS
+        excludes:
+          - Resources/AppIcon.icon
+      - path: StopTypingiOS/Resources/AppIcon.icon
+        type: file
+        buildPhase: resources
+      - path: StopTypingShared
+    dependencies:
+      - package: StopTypingCore
+      - target: StopTypingKeyboard
+    info:
+      path: StopTypingiOS/Info.plist
+      properties:
+        CFBundleDisplayName: Stop Typing App
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    entitlements:
+      path: StopTypingiOS/StopTypingiOS.entitlements
+      properties:
+        # Shared with the keyboard, which reads the settings written here.
+        com.apple.security.application-groups: [group.com.kevintraver.StopTyping]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kevintraver.StopTyping.ios
+        # The iPhone app is versioned on its own; the Mac app's version is the top-level one above.
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 8EDDZ23NT2
+
+  StopTypingKeyboard:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: StopTypingKeyboard
+      - path: StopTypingShared
+    dependencies:
+      - package: StopTypingCore
+    info:
+      path: StopTypingKeyboard/Info.plist
+      properties:
+        CFBundleDisplayName: Stop Typing App
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            # Never asks for Full Access: no network, no shared writes, nothing leaves the keyboard.
+            RequestsOpenAccess: false
+    entitlements:
+      path: StopTypingKeyboard/StopTypingKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.kevintraver.StopTyping]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kevintraver.StopTyping.ios.keyboard
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 8EDDZ23NT2
+
 schemes:
   StopTyping:
     build:
@@ -120,3 +197,7 @@ schemes:
     test:
       targets:
         - StopTypingPrivacyTests
+  StopTypingiOS:
+    build:
+      targets:
+        StopTypingiOS: all
