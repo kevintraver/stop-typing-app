@@ -75,13 +75,11 @@ private struct InputMonitoringRow: View {
                 Button(model.preferences.hasRequestedInputMonitoring ? "Open System Settings…" : "Allow…") {
                     model.requestInputMonitoring()
                 }
-                .accessibilityLabel(model.preferences.hasRequestedInputMonitoring
-                                    ? "Open System Settings to allow Input Monitoring"
-                                    : "Allow Input Monitoring")
+                .accessibilityHint("Allows Input Monitoring")
             } else if model.status == .unavailable {
                 // The rare case where macOS still refuses the tap after the grant.
                 Button("Relaunch") { model.relaunch() }
-                    .accessibilityLabel("Relaunch Stop Typing App")
+                    .accessibilityHint("Restarts Stop Typing App so it can start listening")
             } else {
                 Text("Allowed")
                     .foregroundStyle(.secondary)
