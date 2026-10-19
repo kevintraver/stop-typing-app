@@ -72,8 +72,12 @@ private struct PermissionCallout: View {
                     .buttonStyle(.borderedProminent)
             } else {
                 Text("Allow Stop Typing App in Privacy & Security → Input Monitoring. It only counts characters and never stores what you type.")
-                Button("Open Privacy Settings") { NSWorkspace.shared.open(KeyboardTap.privacySettingsURL) }
-                    .buttonStyle(.borderedProminent)
+                HStack {
+                    Button("Open Privacy Settings") { NSWorkspace.shared.open(KeyboardTap.privacySettingsURL) }
+                        .buttonStyle(.borderedProminent)
+                    Button("Set Up…") { model.showOnboarding() }
+                        .accessibilityHint("Opens the setup checklist")
+                }
             }
         }
         .font(.callout)
