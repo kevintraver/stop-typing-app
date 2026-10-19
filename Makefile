@@ -6,7 +6,7 @@ APP = $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 INSTALL_DIR = $(HOME)/Applications
 INSTALLED_APP = $(INSTALL_DIR)/$(APP_NAME).app
 
-.PHONY: all project build test install run release publish clean
+.PHONY: all project build test test-core test-privacy install run release publish clean
 
 all: build
 
@@ -17,8 +17,14 @@ build: project
 	xcodebuild -project StopTyping.xcodeproj -scheme StopTyping -configuration Debug \
 		-derivedDataPath $(DERIVED_DATA) -quiet build
 
-test:
+test: test-core test-privacy
+
+test-core:
 	swift test --package-path StopTypingCore
+
+test-privacy: project
+	xcodebuild -project StopTyping.xcodeproj -scheme StopTyping -configuration Debug \
+		-destination 'platform=macOS,arch=arm64' -derivedDataPath $(DERIVED_DATA) -quiet test
 
 # Replaces the bundle rather than copying over it, so files removed from the app don't linger.
 install: build

@@ -28,6 +28,7 @@ final class AppModel {
     @ObservationIgnored private var detector = TypingDetector()
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private let tapGate = TapGate()
+    @ObservationIgnored private var inputGeneration: UInt64?
     @ObservationIgnored private var permissionPolling: Task<Void, Never>?
     @ObservationIgnored private var snoozeExpiry: Task<Void, Never>?
     @ObservationIgnored private let hud: NudgeHUD
@@ -263,8 +264,10 @@ final class AppModel {
     /// while an ignored app is in front, and while the stop window (which takes the keys) is up.
     private func updateTapGate() {
         let isSnoozed = preferences.snoozedUntil.map { $0 > .now } ?? false
-        let inIgnoredApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier.map(isExcluded) ?? false
-        tapGate.set(closed: isSnoozed || inIgnoredApp || stopWindow.isShowing)
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let allowed = preferences.isEnabled && !isSnoozed && !stopWindow.isShowing
+            && frontmost?.bundleIdentifier.map { !isExcluded($0) } == true
+        tapGate.allow(processID: allowed ? frontmost?.processIdentifier : nil)
     }
 
     // MARK: Listening
@@ -303,6 +306,8 @@ final class AppModel {
     }
 
     private func stopListening() {
+        tapGate.allow(processID: nil)
+        inputGeneration = nil
         listening?.cancel()
         listening = nil
         permissionPolling?.cancel()
@@ -351,9 +356,13 @@ final class AppModel {
 
     private func handle(_ keystroke: TimedKeystroke) {
         // While the stop window is up, keys go to it rather than to anything worth counting.
-        guard status == .listening, !stopWindow.isShowing else { return }
-        if let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, isExcluded(frontmost) {
-            return
+        updateTapGate()
+        guard status == .listening, !stopWindow.isShowing,
+              tapGate.accepts(generation: keystroke.generation)
+        else { return }
+        if inputGeneration != keystroke.generation {
+            detector.reset()
+            inputGeneration = keystroke.generation
         }
 
         detector.configuration = preferences.detection

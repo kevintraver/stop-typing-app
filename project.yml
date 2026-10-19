@@ -22,6 +22,18 @@ settings:
     CURRENT_PROJECT_VERSION: "2"
 
 targets:
+  StopTypingPrivacyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: StopTypingPrivacyTests
+      - path: StopTyping/Input/KeyboardTap.swift
+    dependencies:
+      - package: StopTypingCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
   StopTyping:
     type: application
     platform: macOS
@@ -95,3 +107,12 @@ targets:
           # the identity when no Developer ID certificate is installed yet.
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
+
+schemes:
+  StopTyping:
+    build:
+      targets:
+        StopTyping: all
+    test:
+      targets:
+        - StopTypingPrivacyTests

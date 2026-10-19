@@ -6,19 +6,37 @@ import Synchronization
 
 struct TimedKeystroke: Sendable {
     var keystroke: Keystroke
+    var generation: UInt64
     /// Seconds since boot; monotonic, unaffected by clock changes.
     var time: TimeInterval
 }
 
-/// Lets the app stop the tap from reading keys at all, without tearing it down: while snoozed, in an
-/// ignored app, or while the stop window is up. The tap checks it before a key's characters are read.
+/// The policy and character classification share a lock, so closing the gate also waits for
+/// any classification already in progress. No app identity leaves this boundary with the counts.
 final class TapGate: Sendable {
-    private let closed = Atomic(false)
+    private let scope = Mutex(InputScope())
 
-    var isClosed: Bool { closed.load(ordering: .relaxed) }
+    func allow(processID: pid_t?) {
+        scope.withLock { $0.allow(processID: processID) }
+    }
 
-    func set(closed: Bool) {
-        self.closed.store(closed, ordering: .relaxed)
+    func accepts(generation: UInt64) -> Bool {
+        scope.withLock { $0.accepts(generation: generation) }
+    }
+
+    func classify(_ event: CGEvent) -> TimedKeystroke? {
+        scope.withLock { scope in
+            let destination = event.getIntegerValueField(.eventTargetUnixProcessID)
+            guard let processID = pid_t(exactly: destination),
+                  let generation = scope.capture(processID: processID),
+                  let keystroke = Keystroke(event)
+            else { return nil }
+            return TimedKeystroke(
+                keystroke: keystroke,
+                generation: generation,
+                time: ProcessInfo.processInfo.systemUptime
+            )
+        }
     }
 }
 
@@ -55,7 +73,7 @@ enum KeyboardTap {
         let context = TapContext(continuation: continuation, gate: gate)
         let userInfo = Unmanaged.passRetained(context).toOpaque()
         guard let port = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cgAnnotatedSessionEventTap,
             place: .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
@@ -120,9 +138,9 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
     switch type {
     case .tapDisabledByTimeout, .tapDisabledByUserInput:
         if let port = context.port { CGEvent.tapEnable(tap: port, enable: true) }
-    case .keyDown where !context.gate.isClosed:
-        if let keystroke = Keystroke(event) {
-            context.continuation.yield(TimedKeystroke(keystroke: keystroke, time: ProcessInfo.processInfo.systemUptime))
+    case .keyDown:
+        if let keystroke = context.gate.classify(event) {
+            context.continuation.yield(keystroke)
         }
     default:
         break
