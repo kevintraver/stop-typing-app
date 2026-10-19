@@ -38,6 +38,7 @@ final class AppModel {
     @ObservationIgnored private let stopWindow = StopWindow()
     @ObservationIgnored private let focus = FocusStatus()
     @ObservationIgnored private let notifier = NotificationNudger()
+    @ObservationIgnored private let onboarding = OnboardingWindow()
 
     init() {
         let preferences = Preferences()
@@ -111,10 +112,37 @@ final class AppModel {
         trackFrontmostApp()
         refreshPermissionOnActivation()
         if preferences.isQuietDuringFocus { focus.start() }
-        if preferences.isEnabled && !KeyboardTap.hasPermission {
+        updateListening()
+        // The setup window asks for Input Monitoring itself, so the system prompt never appears unexplained.
+        if !preferences.hasCompletedOnboarding || (preferences.isEnabled && !KeyboardTap.hasPermission) {
+            showOnboarding()
+        }
+    }
+
+    // MARK: Setup
+
+    func showOnboarding() {
+        onboarding.show(model: self)
+    }
+
+    func completeOnboarding() {
+        preferences.hasCompletedOnboarding = true
+        onboarding.close()
+    }
+
+    /// Closes the setup window without finishing it, so it opens again at the next launch.
+    func closeOnboarding() {
+        onboarding.close()
+    }
+
+    /// The system prompt appears only the first time; after that the switch is only in System Settings.
+    func requestInputMonitoring() {
+        if preferences.hasRequestedInputMonitoring {
+            NSWorkspace.shared.open(KeyboardTap.privacySettingsURL)
+        } else {
+            preferences.hasRequestedInputMonitoring = true
             KeyboardTap.requestPermission()
         }
-        updateListening()
     }
 
     // MARK: Snooze

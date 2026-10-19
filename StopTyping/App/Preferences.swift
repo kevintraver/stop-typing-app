@@ -47,6 +47,14 @@ final class Preferences {
     var stats: DailyStats {
         didSet { defaults.set(try? JSONEncoder().encode(stats), forKey: Key.stats) }
     }
+    /// Set by Done in the setup window. Until then the window opens at every launch.
+    var hasCompletedOnboarding: Bool {
+        didSet { defaults.set(hasCompletedOnboarding, forKey: Key.hasCompletedOnboarding) }
+    }
+    /// The system shows its Input Monitoring prompt only once, so later requests open System Settings instead.
+    var hasRequestedInputMonitoring: Bool {
+        didSet { defaults.set(hasRequestedInputMonitoring, forKey: Key.hasRequestedInputMonitoring) }
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -59,6 +67,8 @@ final class Preferences {
             Key.stopsWhenIgnored: false,
             Key.skipsStopInFullScreen: true,
             Key.isQuietDuringFocus: true,
+            Key.hasCompletedOnboarding: false,
+            Key.hasRequestedInputMonitoring: false,
         ])
         isEnabled = defaults.bool(forKey: Key.isEnabled)
         showsOnScreenNudge = defaults.bool(forKey: Key.showsOnScreenNudge)
@@ -73,6 +83,8 @@ final class Preferences {
         }
         snoozedUntil = defaults.object(forKey: Key.snoozedUntil) as? Date
         stats = defaults.decoded(DailyStats.self, forKey: Key.stats) ?? DailyStats(day: .now)
+        hasCompletedOnboarding = defaults.bool(forKey: Key.hasCompletedOnboarding)
+        hasRequestedInputMonitoring = defaults.bool(forKey: Key.hasRequestedInputMonitoring)
     }
 
     private enum Key {
@@ -87,6 +99,8 @@ final class Preferences {
         static let nudgeOffset = "nudgeOffset"
         static let snoozedUntil = "snoozedUntil"
         static let stats = "stats"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let hasRequestedInputMonitoring = "hasRequestedInputMonitoring"
     }
 }
 
