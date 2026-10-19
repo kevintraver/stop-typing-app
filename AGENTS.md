@@ -15,7 +15,7 @@ Notes for coding agents (and people) working on Stop Typing App. README.md cover
 
 - Swift 6 strict concurrency, SwiftUI first, `@Observable`, macOS 15+. Doc comments explain *why*. No speculative defensive checks; never cast to `any`.
 - UI copy is short and plain (the app's voice: "You're typing a lot. Use dictation instead."). Settings rows are settings; actions such as Preview or Reset go in `SectionActions` under their section.
-- Never log or store typed characters. The `os.Logger` subsystem is `com.kevintraver.StopTyping` and logs decisions and timings only.
+- The app logs nothing: no `os.Logger`, `print` or `NSLog`, not even nudge timings or app names. Don't add logging; debug with the debugger or temporary changes you don't commit. Typed characters are never stored anywhere; the only persisted data is settings, the ignore list and today's counts in `UserDefaults`.
 - Commit as you go with Conventional Commits (`feat(scope):`, `fix:`, `build:`, `docs:`), one logical, building change per commit. When agents work in parallel worktrees, rebase onto the integration branch before finishing.
 
 ## Traps
@@ -24,8 +24,7 @@ Notes for coding agents (and people) working on Stop Typing App. README.md cover
 - **Permissions follow the signature.** Input Monitoring is keyed to the signing identity and bundle ID (`com.kevintraver.StopTyping`). Ad-hoc signing or a new bundle ID silently loses the grant.
 - **A tap made before Input Monitoring is granted never receives keys**, and macOS doesn't upgrade it. The app only creates the tap after `CGPreflightListenEventAccess()` is true, so no relaunch is needed; Relaunch is only the fallback when tap creation still fails.
 - **Full-screen windows stop below the notch.** Compare against the screen minus `safeAreaInsets.top`, or check that the frontmost app owns every layer-0 window (it has its own Space). Window bounds and owners need no permission; titles need Screen Recording.
-- **Focus detection** (`INFocusStatusCenter`) is authorized without the Communication Notifications entitlement here, but has not yet been seen reporting `true` with a Focus on. Verify before relying on it.
-- **zsh has a builtin `log`.** Use `/usr/bin/log show --last 5m --predicate 'subsystem == "com.kevintraver.StopTyping"'`.
+- **Focus detection** (`INFocusStatusCenter`) is authorized without the Communication Notifications entitlement here, but has not yet been seen reporting `true` with a Focus on. Verify it by turning on Do Not Disturb and typing a paragraph: no nudge should appear.
 - **`actool` resolves relative paths through a daemon** with a different working directory. Pass absolute paths when compiling icons by hand.
 - **SourceKit shows "No such module 'StopTypingCore'"** in editors that don't load the generated project. Trust `make build`.
 - **Sparkle in the sandbox** needs the installer and downloader XPC services and the `-spks`/`-spki` mach-lookup exceptions (all in `project.yml`). Development builds have no `SUPublicEDKey`, so the updater deliberately never starts.

@@ -26,7 +26,7 @@ On first launch a setup window walks through permissions. Only **Input Monitorin
 
 ## Privacy
 
-Stop Typing App uses a *listen-only* event tap, so it can observe key presses but never delay, change or block them. Each key is turned into a count the moment it arrives; characters are never stored, logged or sent anywhere. Password fields are invisible to it because macOS hides keystrokes while secure input is on.
+Stop Typing App uses a *listen-only* event tap, so it can observe key presses but never delay, change or block them. Each key is turned into a count the moment it arrives; characters are never stored, logged or sent anywhere. The app writes no logs at all. All it keeps, in its own sandboxed preferences, is your settings, your ignore list and today's two counts (nudges and an estimate of words typed). Password fields are invisible to it because macOS hides keystrokes while secure input is on.
 
 The app is sandboxed and has no network access of its own. The only network traffic is Sparkle's update check: release builds fetch the appcast and updates from this repository's GitHub releases through Sparkle's downloader service. Nothing about your typing is ever sent.
 
