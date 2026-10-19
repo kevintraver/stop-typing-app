@@ -11,7 +11,7 @@ struct SettingsView: View {
             Tab("Detection", systemImage: "text.word.spacing") { DetectionSettings() }
             Tab("Apps", systemImage: "app.badge.checkmark") { ExcludedAppsSettings() }
         }
-        .frame(width: 480, height: 400)
+        .frame(width: 480, height: 520)
     }
 }
 
@@ -29,8 +29,41 @@ private struct GeneralSettings: View {
                 LaunchAtLoginToggle()
             }
 
-            Section("Nudges") {
-                Toggle("Show on-screen nudge", isOn: $preferences.showsOnScreenNudge)
+            Section {
+                Toggle(isOn: $preferences.showsOnScreenNudge) {
+                    Text("Show on-screen nudge")
+                    Text("Appears near the top of the screen you're typing on. Drag it anywhere; it stays there.")
+                }
+            } header: {
+                Text("On-Screen Nudge")
+            } footer: {
+                SectionActions {
+                    Button("Preview") { model.preview(.gentle) }
+                    Button("Reset Position") { preferences.nudgeOffset = nil }
+                        .disabled(preferences.nudgeOffset == nil)
+                }
+            }
+
+            Section {
+                Toggle(isOn: $preferences.stopsWhenIgnored) {
+                    Text("Stop me if I keep typing")
+                    Text("If you keep typing after a nudge, show a window you have to click to dismiss.")
+                }
+                if preferences.stopsWhenIgnored {
+                    Toggle(isOn: $preferences.skipsStopInFullScreen) {
+                        Text("Not in full-screen apps")
+                        Text("Show the on-screen nudge instead.")
+                    }
+                }
+            } header: {
+                Text("Stop Window")
+            } footer: {
+                SectionActions {
+                    Button("Preview") { model.preview(.stop) }
+                }
+            }
+
+            Section("Notifications & Focus") {
                 Toggle(isOn: $model.sendsNotifications) {
                     Text("Also send to Notification Center")
                     Text("Only the first nudge each time, never the follow-ups.")
@@ -43,33 +76,9 @@ private struct GeneralSettings: View {
                     }
                     .foregroundStyle(.secondary)
                 }
-                Toggle(isOn: $preferences.stopsWhenIgnored) {
-                    Text("Stop me if I keep typing")
-                    Text("If you keep typing after a nudge, show a window you have to click to dismiss.")
-                }
-                if preferences.stopsWhenIgnored {
-                    Toggle(isOn: $preferences.skipsStopInFullScreen) {
-                        Text("Not in full-screen apps")
-                        Text("Show the on-screen nudge instead.")
-                    }
-                    .padding(.leading, 20)
-                }
                 Toggle(isOn: $model.isQuietDuringFocus) {
                     Text("Stay quiet during Focus")
                     Text("No nudges at all while Do Not Disturb or another Focus is on.")
-                }
-                LabeledContent("Preview") {
-                    HStack {
-                        Button("Nudge") { model.preview(.gentle) }
-                        Button("Stop Window") { model.preview(.stop) }
-                    }
-                }
-                LabeledContent {
-                    Button("Reset Position") { preferences.nudgeOffset = nil }
-                        .disabled(preferences.nudgeOffset == nil)
-                } label: {
-                    Text("Nudge position")
-                    Text("Drag the on-screen nudge to move it. It stays where you leave it.")
                 }
             }
 
@@ -90,6 +99,20 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Small link-style actions under a section, for things that aren't settings themselves.
+private struct SectionActions<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 16) {
+            content
+        }
+        .buttonStyle(.link)
+        .font(.callout)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
