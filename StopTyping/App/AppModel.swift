@@ -156,6 +156,12 @@ final class AppModel {
 
     // MARK: Nudges
 
+    /// Moves the nudge back to its default spot and shows it there, so the reset is visible right away.
+    func resetNudgePosition() {
+        preferences.nudgeOffset = nil
+        hud.show(.gentle)
+    }
+
     func preview(_ nudge: Nudge) {
         switch nudge {
         case .stop: stopWindow.show(ignoring: nil) { _ in }

@@ -39,7 +39,7 @@ private struct GeneralSettings: View {
             } footer: {
                 SectionActions {
                     Button("Preview") { model.preview(.gentle) }
-                    Button("Reset Position") { preferences.nudgeOffset = nil }
+                    Button("Reset Position") { model.resetNudgePosition() }
                         .disabled(preferences.nudgeOffset == nil)
                 }
             }
