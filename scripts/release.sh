@@ -57,6 +57,19 @@ if [[ "${MODE}" == "publish" && -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+# Sparkle decides whether an update is newer by build number, not version, so a release that doesn't
+# raise CURRENT_PROJECT_VERSION is silently never offered to anyone. Compare with the published appcast.
+BUILD="$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION:[[:space:]]*"?([^"[:space:]]+)"?[[:space:]]*$/\1/p' "${REPO_DIR}/project.yml" | head -1)"
+if [[ "${MODE}" == "publish" ]]; then
+  PUBLISHED_BUILD="$(curl -fsSL "https://github.com/${GITHUB_REPO}/releases/latest/download/appcast.xml" 2>/dev/null \
+    | sed -nE 's|.*<sparkle:version>([0-9]+)</sparkle:version>.*|\1|p' | sort -n | tail -1)"
+  if [[ -n "${PUBLISHED_BUILD}" && "${BUILD}" -le "${PUBLISHED_BUILD}" ]]; then
+    echo "error: CURRENT_PROJECT_VERSION ${BUILD} isn't above the published build ${PUBLISHED_BUILD} in project.yml;" \
+      "Sparkle would never offer this release as an update" >&2
+    exit 1
+  fi
+fi
+
 # --- Signing identity ---------------------------------------------------------------------------
 # Only a Developer ID Application certificate produces something Gatekeeper accepts on other Macs.
 # Without one the pipeline still runs end to end, signed with Apple Development (or ad hoc), so

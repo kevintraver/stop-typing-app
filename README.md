@@ -44,7 +44,7 @@ make build    # build only (build/Build/Products/Debug)
 make install  # build and install to ~/Applications without launching
 ```
 
-The Xcode project is generated from `project.yml`, so edit that rather than the `.xcodeproj` (which isn't checked in). Run `make project` and open `StopTyping.xcodeproj` to work in Xcode. The version lives only in `project.yml` (`MARKETING_VERSION`).
+The Xcode project is generated from `project.yml`, so edit that rather than the `.xcodeproj` (which isn't checked in). Run `make project` and open `StopTyping.xcodeproj` to work in Xcode. The version lives only in `project.yml`: bump `MARKETING_VERSION` (what people see) **and** `CURRENT_PROJECT_VERSION` (the build number Sparkle compares) for every release; `make publish` refuses a build number that isn't higher than the published one.
 
 The app runs from `~/Applications`, not `build/`, so `make clean` can't delete it from under you. Debug builds are signed with an Apple Development certificate, so macOS keeps the Input Monitoring permission across rebuilds. To build with a different account, change `DEVELOPMENT_TEAM` in `project.yml`.
 

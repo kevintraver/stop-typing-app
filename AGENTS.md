@@ -28,4 +28,4 @@ Notes for coding agents (and people) working on Stop Typing App. README.md cover
 - **`actool` resolves relative paths through a daemon** with a different working directory. Pass absolute paths when compiling icons by hand.
 - **SourceKit shows "No such module 'StopTypingCore'"** in editors that don't load the generated project. Trust `make build`.
 - **Sparkle in the sandbox** needs the installer and downloader XPC services and the `-spks`/`-spki` mach-lookup exceptions (all in `project.yml`). Development builds have no `SUPublicEDKey`, so the updater deliberately never starts.
-- **`project.yml` is the source of truth.** `Info.plist` and the entitlements file are regenerated from it; the version lives only in `MARKETING_VERSION`.
+- **`project.yml` is the source of truth.** `Info.plist` and the entitlements file are regenerated from it; the version lives only there. Every release must raise both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`: Sparkle compares build numbers, so an unchanged one means nobody is offered the update (`make publish` checks).
