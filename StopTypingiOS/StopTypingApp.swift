@@ -33,7 +33,7 @@ struct ContentView: View {
                 } header: {
                     Text("Try it")
                 } footer: {
-                    Text("Type a couple of sentences. The keys dim and an arrow points at the microphone below the keyboard.")
+                    Text("Type a couple of sentences. A message covers the keys and points at the microphone below the keyboard; tap Keep Typing to carry on.")
                 }
 
                 Section {

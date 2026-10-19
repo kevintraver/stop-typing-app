@@ -12,14 +12,12 @@ import UIKit
 @Observable
 final class KeyboardModel {
     private(set) var input: KeyboardInput
-    private(set) var isDimmed = false
-    /// Bumped once per pulse toward the mic; the view animates on each change.
-    private(set) var pulses = 0
+    /// The nudge covering the keys until it's acknowledged, if any.
+    private(set) var shownNudge: Nudge?
 
     @ObservationIgnored private var detector = TypingDetector()
     @ObservationIgnored private let insertText: (String) -> Void
     @ObservationIgnored private let deleteBackward: () -> Void
-    @ObservationIgnored private var undim: Task<Void, Never>?
     @ObservationIgnored private let stats = StatsStore()
 
     init(autocapitalizes: Bool, insertText: @escaping (String) -> Void, deleteBackward: @escaping () -> Void) {
@@ -34,6 +32,7 @@ final class KeyboardModel {
         input = KeyboardInput(autocapitalizes: autocapitalizes)
         detector.configuration = SharedSettings.detection
         detector.reset()
+        shownNudge = nil
     }
 
     func press(_ key: KeyboardInput.Key) {
@@ -61,8 +60,8 @@ final class KeyboardModel {
         }
     }
 
-    /// Dims the keys for a moment (they stay tappable), pulses toward Apple's mic below the keyboard,
-    /// and taps a haptic. Typing is never blocked.
+    /// Covers the keys with a message pointing at Apple's mic below the keyboard, and taps a haptic.
+    /// One tap on Keep Typing brings the keys back, so typing is never more than a tap away.
     func nudge(_ nudge: Nudge) {
         if SharedSettings.hapticsEnabled {
             switch nudge {
@@ -70,16 +69,12 @@ final class KeyboardModel {
             case .firm, .stop: UINotificationFeedbackGenerator().notificationOccurred(.warning)
             }
         }
-        UIAccessibility.post(notification: .announcement, argument: String(localized: "You're typing a lot. Dictate with the microphone below the keyboard."))
+        UIAccessibility.post(notification: .screenChanged, argument: nil)
+        withAnimation(.snappy(duration: 0.2)) { shownNudge = nudge }
+    }
 
-        withAnimation(.easeOut(duration: 0.15)) { isDimmed = true }
-        pulses += nudge == .gentle ? 1 : 2
-        undim?.cancel()
-        undim = Task {
-            try? await Task.sleep(for: nudge == .gentle ? .seconds(1.5) : .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeIn(duration: 0.4)) { isDimmed = false }
-        }
+    func acknowledgeNudge() {
+        withAnimation(.snappy(duration: 0.2)) { shownNudge = nil }
     }
 }
 

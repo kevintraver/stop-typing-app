@@ -21,9 +21,11 @@ struct KeyboardView: View {
         .padding(.horizontal, 3)
         .padding(.top, 10)
         .padding(.bottom, 4)
-        .opacity(model.isDimmed ? 0.45 : 1)
-        .overlay(alignment: .bottomTrailing) {
-            MicPulse(pulses: model.pulses)
+        .overlay {
+            if let nudge = model.shownNudge {
+                NudgeMessage(nudge: nudge, acknowledge: model.acknowledgeNudge)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -207,34 +209,48 @@ private struct DeleteKey: View {
     }
 }
 
-/// Points down at Apple's dictation mic, which iOS draws at the bottom-right just below the keyboard.
-private struct MicPulse: View {
-    let pulses: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isShowing = false
+/// Replaces the keys with a nudge until it's acknowledged. The arrow points at Apple's dictation mic,
+/// which iOS draws at the bottom-right just below the keyboard and stays tappable the whole time.
+private struct NudgeMessage: View {
+    let nudge: Nudge
+    let acknowledge: () -> Void
 
     var body: some View {
-        Image(systemName: "arrow.down.circle.fill")
-            .font(.system(size: 30))
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.white, .red)
-            .scaleEffect(isShowing && !reduceMotion ? 1.15 : 1)
-            .opacity(isShowing ? 1 : 0)
-            .padding(.trailing, 22)
-            .padding(.bottom, 2)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-            .onChange(of: pulses) { old, new in
-                Task { await pulse(times: new - old) }
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color.red.gradient, in: .circle)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text("Use dictation instead: tap the microphone below.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
+            HStack {
+                Button("Keep Typing", action: acknowledge)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                Spacer()
+                Image(systemName: "arrow.down.right")
+                    .font(.title.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
     }
 
-    private func pulse(times: Int) async {
-        for _ in 0..<max(times, 1) {
-            withAnimation(.easeOut(duration: 0.25)) { isShowing = true }
-            try? await Task.sleep(for: .milliseconds(650))
-            withAnimation(.easeIn(duration: 0.25)) { isShowing = false }
-            try? await Task.sleep(for: .milliseconds(300))
-        }
+    private var title: String {
+        nudge == .gentle ? String(localized: "You're typing a lot.") : String(localized: "Still typing?")
     }
 }
