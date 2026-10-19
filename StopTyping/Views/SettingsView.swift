@@ -9,7 +9,7 @@ struct SettingsView: View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Detection", systemImage: "text.word.spacing") { DetectionSettings() }
-            Tab("Apps", systemImage: "app.badge.checkmark") { ExcludedAppsSettings() }
+            Tab("Ignore", systemImage: "eye.slash") { ExcludedAppsSettings() }
         }
         .frame(width: 480, height: 520)
     }
