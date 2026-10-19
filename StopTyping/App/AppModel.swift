@@ -36,11 +36,13 @@ final class AppModel {
     @ObservationIgnored private let focus = FocusStatus()
     @ObservationIgnored private let notifier = NotificationNudger()
     @ObservationIgnored private let onboarding = OnboardingWindow()
+    @ObservationIgnored private let statsRollover: StatsRollover
 
     init() {
         let preferences = Preferences()
         self.preferences = preferences
         hud = NudgeHUD(preferences: preferences)
+        statsRollover = StatsRollover(preferences: preferences)
     }
 
     var status: Status {
@@ -105,8 +107,7 @@ final class AppModel {
     }
 
     func start() {
-        // Only today's counts are kept: a previous day's are cleared rather than left until the next prose.
-        preferences.stats = preferences.stats.on(.now)
+        statsRollover.start()
         if let until = preferences.snoozedUntil { scheduleSnoozeExpiry(at: until) }
         trackFrontmostApp()
         refreshPermissionOnActivation()

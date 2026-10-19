@@ -28,6 +28,8 @@ targets:
     sources:
       - path: StopTypingPrivacyTests
       - path: StopTyping/Input/KeyboardTap.swift
+      - path: StopTyping/App/Preferences.swift
+      - path: StopTyping/App/StatsRollover.swift
     dependencies:
       - package: StopTypingCore
     settings:

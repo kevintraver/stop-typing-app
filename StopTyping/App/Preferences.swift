@@ -58,6 +58,11 @@ final class Preferences {
 
     @ObservationIgnored private let defaults: UserDefaults
 
+    func refreshStats(at date: Date = .now, calendar: Calendar = .current) {
+        let today = stats.on(date, calendar: calendar)
+        if stats != today { stats = today }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
