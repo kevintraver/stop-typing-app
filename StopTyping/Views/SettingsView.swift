@@ -99,8 +99,13 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Permissions")
             } footer: {
-                Text("Stop Typing App only counts characters to tell prose from shortcuts. It never stores or sends what you type.")
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Stop Typing App only counts characters to tell prose from shortcuts. It never stores or sends what you type.")
+                        .foregroundStyle(.secondary)
+                    SectionActions {
+                        Button("Set Up…") { model.showOnboarding() }
+                    }
+                }
             }
 
             UpdatesSection()
