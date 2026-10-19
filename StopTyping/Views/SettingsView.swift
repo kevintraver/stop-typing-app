@@ -304,12 +304,15 @@ private struct ExcludedAppsSettings: View {
                 }
             }
 
-            HStack(spacing: 4) {
-                Button("Add App", systemImage: "plus") { isChoosingApps = true }
-                Button("Remove App", systemImage: "minus", action: removeSelection)
+            HStack(spacing: 0) {
+                Button { isChoosingApps = true } label: { ListControlLabel(systemImage: "plus") }
+                    .accessibilityLabel("Add App")
+                Divider()
+                    .frame(height: 14)
+                Button(action: removeSelection) { ListControlLabel(systemImage: "minus") }
+                    .accessibilityLabel("Remove App")
                     .disabled(selection.isEmpty)
             }
-            .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
         }
         .padding(20)
@@ -325,6 +328,18 @@ private struct ExcludedAppsSettings: View {
                     model.setExcluded(true, bundleID: bundleID)
                 }
             }
+        }
+    }
+
+    /// A full-size hit area for the +/− buttons. Icon-only borderless buttons are only as tall as their
+    /// glyph, which made the thin minus stroke nearly impossible to click.
+    private struct ListControlLabel: View {
+        let systemImage: String
+
+        var body: some View {
+            Image(systemName: systemImage)
+                .frame(width: 24, height: 22)
+                .contentShape(.rect)
         }
     }
 
