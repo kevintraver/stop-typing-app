@@ -25,7 +25,12 @@ private struct GeneralSettings: View {
         @Bindable var preferences = model.preferences
         Form {
             Section {
-                Toggle("Watch for long typing", isOn: $model.isEnabled)
+                Toggle(isOn: $model.isWatching) {
+                    Text("Watch for long typing")
+                    if let snoozed = model.snoozeDescription {
+                        Text("\(snoozed). Turn on to resume.")
+                    }
+                }
                 LaunchAtLoginToggle()
             }
 

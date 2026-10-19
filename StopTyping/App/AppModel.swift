@@ -64,6 +64,23 @@ final class AppModel {
         }
     }
 
+    /// The main switch as people see it: off while paused or snoozed. Flipping it always ends a snooze.
+    var isWatching: Bool {
+        get { preferences.isEnabled && snoozeDescription == nil }
+        set {
+            resume()
+            isEnabled = newValue
+        }
+    }
+
+    /// "Snoozed until 3:45 PM" or "Snoozed until tomorrow"; nil when not snoozed.
+    var snoozeDescription: String? {
+        guard let until = preferences.snoozedUntil, until > .now else { return nil }
+        return Calendar.current.isDateInToday(until)
+            ? String(localized: "Snoozed until \(until.formatted(date: .omitted, time: .shortened))")
+            : String(localized: "Snoozed until tomorrow")
+    }
+
     var sendsNotifications: Bool {
         get { preferences.sendsNotifications }
         set {

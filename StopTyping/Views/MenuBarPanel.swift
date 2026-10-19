@@ -43,22 +43,20 @@ private struct Header: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Toggle("Watch for long typing", isOn: $model.isEnabled)
+            Toggle("Watch for long typing", isOn: $model.isWatching)
                 .toggleStyle(.switch)
                 .labelsHidden()
         }
         .padding(16)
     }
 
-    private var statusText: LocalizedStringResource {
+    private var statusText: String {
         switch model.status {
-        case .listening: "Watching for long typing"
-        case .off: "Paused"
-        case .needsPermission: "Needs Input Monitoring permission"
-        case .unavailable: "Couldn't start listening"
-        case .snoozed(let until) where Calendar.current.isDateInToday(until):
-            "Snoozed until \(until.formatted(date: .omitted, time: .shortened))"
-        case .snoozed: "Snoozed until tomorrow"
+        case .listening: String(localized: "Watching for long typing")
+        case .off: String(localized: "Paused")
+        case .needsPermission: String(localized: "Needs Input Monitoring permission")
+        case .unavailable: String(localized: "Couldn't start listening")
+        case .snoozed: model.snoozeDescription ?? ""
         }
     }
 }
