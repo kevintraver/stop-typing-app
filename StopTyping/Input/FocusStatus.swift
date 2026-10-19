@@ -1,7 +1,4 @@
 import Intents
-import os
-
-private let log = Logger(subsystem: "com.kevintraver.StopTyping", category: "focus")
 
 /// Whether a Focus such as Do Not Disturb is on. macOS asks the user once for access.
 ///
@@ -15,14 +12,10 @@ final class FocusStatus {
     func start() {
         guard polling == nil else { return }
         polling = Task {
-            let status = await INFocusStatusCenter.default.requestAuthorization()
-            log.notice("Focus status authorization: \(status.rawValue, privacy: .public)")
+            _ = await INFocusStatusCenter.default.requestAuthorization()
             while !Task.isCancelled {
                 let focused = INFocusStatusCenter.default.focusStatus.isFocused ?? false
-                if focused != isFocused {
-                    log.notice("Focus is \(focused ? "on" : "off", privacy: .public)")
-                    isFocused = focused
-                }
+                if focused != isFocused { isFocused = focused }
                 try? await Task.sleep(for: .seconds(3))
             }
         }

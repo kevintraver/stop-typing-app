@@ -1,11 +1,6 @@
 import AppKit
 import Observation
-import os
 import StopTypingCore
-
-/// Records nudge decisions and timings only, never typed characters.
-/// Read with `log show --last 10m --predicate 'subsystem == "com.kevintraver.StopTyping"'`.
-private let log = Logger(subsystem: "com.kevintraver.StopTyping", category: "nudges")
 
 @MainActor
 @Observable
@@ -30,7 +25,6 @@ final class AppModel {
     private(set) var notificationsDenied = false
 
     @ObservationIgnored private var detector = TypingDetector()
-    @ObservationIgnored private var lastNudge: Date?
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var permissionPolling: Task<Void, Never>?
     @ObservationIgnored private var snoozeExpiry: Task<Void, Never>?
@@ -222,7 +216,6 @@ final class AppModel {
             showNudge(nudge)
         case .stop:
             if preferences.skipsStopInFullScreen && FrontmostWindow.isFullScreen {
-                log.notice("Full screen: showing the on-screen nudge instead of the stop window")
                 showNudge(.firm)
             } else {
                 // The stop window already demands attention, so it isn't also sent to Notification Center.
@@ -272,13 +265,11 @@ final class AppModel {
 
         do throws(KeyboardTapError) {
             let keystrokes = try KeyboardTap.keystrokes()
-            log.notice("Listening for typing")
             tapState = .listening
             listening = Task {
                 for await keystroke in keystrokes { handle(keystroke) }
             }
         } catch {
-            log.notice("Couldn't start listening: \(String(describing: error), privacy: .public)")
             switch error {
             case .permissionDenied:
                 tapState = .needsPermission
@@ -308,7 +299,6 @@ final class AppModel {
         let granted = KeyboardTap.hasPermission
         if granted != hasInputMonitoringPermission { hasInputMonitoringPermission = granted }
         guard granted, tapState == .needsPermission else { return }
-        log.notice("Input Monitoring granted: starting the tap without relaunching")
         permissionPolling?.cancel()
         permissionPolling = nil
         updateListening()
@@ -341,7 +331,6 @@ final class AppModel {
         // While the stop window is up, keys go to it rather than to anything worth counting.
         guard status == .listening, !stopWindow.isShowing else { return }
         if let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, isExcluded(frontmost) {
-            log.debug("Ignoring a key in excluded app \(frontmost, privacy: .public)")
             return
         }
 
@@ -353,14 +342,8 @@ final class AppModel {
             preferences.stats.recordProse(outcome.newProseCharacters, at: .now)
         }
         if let nudge = outcome.nudge {
-            log.notice("Nudge: \(String(describing: nudge), privacy: .public)")
-            lastNudge = .now
             preferences.stats.recordNudge(at: .now)
             present(nudge)
-        } else if outcome.newProseCharacters > 1, let lastNudge {
-            // More than one new character means this keystroke is the one that made the burst read like prose.
-            let since = Int(Date.now.timeIntervalSince(lastNudge))
-            log.notice("Prose burst, no nudge: \(since) s since the last nudge, cooldown \(Int(self.preferences.detection.cooldown)) s")
         }
     }
 }
