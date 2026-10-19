@@ -87,6 +87,8 @@ private struct GeneralSettings: View {
                 }
             }
 
+            StatisticsSection()
+
             Section {
                 LabeledContent("Input Monitoring") {
                     if model.hasInputMonitoringPermission {
@@ -111,6 +113,31 @@ private struct GeneralSettings: View {
             UpdatesSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct StatisticsSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var isConfirmingReset = false
+
+    var body: some View {
+        let today = model.preferences.stats.on(.now)
+        Section {
+            LabeledContent("Nudges today", value: today.nudges.formatted())
+            LabeledContent("Words typed today", value: "≈ \(today.estimatedWords.formatted())")
+        } header: {
+            Text("Statistics")
+        } footer: {
+            SectionActions {
+                Button("Reset Statistics") { isConfirmingReset = true }
+                    .disabled(today.nudges == 0 && today.proseCharacters == 0)
+            }
+        }
+        .confirmationDialog("Reset today's statistics?", isPresented: $isConfirmingReset) {
+            Button("Reset", role: .destructive) { model.preferences.resetStats() }
+        } message: {
+            Text("Your nudge and word counts start over from zero.")
+        }
     }
 }
 

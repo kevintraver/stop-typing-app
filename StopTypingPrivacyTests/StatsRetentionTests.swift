@@ -42,6 +42,22 @@ struct StatsRetentionTests {
         #expect(Calendar.current.isDate(restored.stats.day, inSameDayAs: date))
     }
 
+    @Test func resettingErasesPersistedCounts() throws {
+        let domain = "StopTypingPrivacyTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let preferences = Preferences(defaults: defaults)
+        let date = Date.now
+        preferences.stats.recordProse(120, at: date)
+        preferences.stats.recordNudge(at: date)
+        preferences.resetStats(at: date)
+
+        let restored = Preferences(defaults: defaults)
+        #expect(restored.stats.proseCharacters == 0)
+        #expect(restored.stats.nudges == 0)
+        #expect(Calendar.current.isDate(restored.stats.day, inSameDayAs: date))
+    }
+
     @Test func refreshingWithinTheDayPreservesCounts() throws {
         let domain = "StopTypingPrivacyTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: domain))

@@ -63,6 +63,11 @@ final class Preferences {
         if stats != today { stats = today }
     }
 
+    /// Starts today's counts over, from Reset Statistics in Settings.
+    func resetStats(at date: Date = .now, calendar: Calendar = .current) {
+        stats = DailyStats(day: date, calendar: calendar)
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
