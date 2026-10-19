@@ -170,7 +170,9 @@ else
   /usr/bin/ditto "${ARCHIVE}/Products/Applications/${APP_NAME}.app" "${APP_BUNDLE}"
   # Without an export, Xcode has re-signed Sparkle.framework but left its XPC services and helpers
   # with Sparkle's ad hoc signature. Re-sign them inside out, as Sparkle's sandboxing guide does by
-  # hand, then the app itself. Never --deep: the Downloader has entitlements the others don't.
+  # hand, then the app itself. Never --deep, which would replace each helper's own signing settings.
+  # Note: as Sparkle ships them, the Downloader and Installer have no entitlements, so they run outside
+  # the sandbox; only the app itself (which sees the keyboard) is sandboxed, with no network access.
   SIGN=(codesign --force --options runtime --sign "${SIGN_ID}")
   SPARKLE_VERSION_DIR="${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework/Versions/B"
   "${SIGN[@]}" "${SPARKLE_VERSION_DIR}/XPCServices/Installer.xpc"

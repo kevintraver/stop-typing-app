@@ -123,7 +123,7 @@ private struct UpdatesSection: View {
             Toggle(isOn: $updater.automaticallyChecksForUpdates) {
                 Text("Check for updates automatically")
                 if updater.isAvailable {
-                    Text("Off by default. When on, the app asks GitHub once a day for a new version, sending only its version number. Off, it makes no network connections at all.")
+                    Text("Off by default. When on, Sparkle asks GitHub once a day for a newer version. The request carries the app's name and version, your language and, like any web request, your IP address; never anything you typed. Off, the app makes no network connections at all.")
                 } else {
                     Text("Development builds don't update themselves.")
                 }

@@ -150,7 +150,7 @@ private struct UpdatesRow: View {
             isDone: updater.automaticallyChecksForUpdates,
             title: "Automatic Updates",
             badge: "Optional",
-            detail: "Asks GitHub once a day for a new version, sending only the app's version number. Off means no network connections at all."
+            detail: "Asks GitHub once a day for a newer version, sending the app's name and version and, like any web request, your IP address. Off means no network connections at all."
         ) {
             Toggle("Check for updates automatically", isOn: $updater.automaticallyChecksForUpdates)
                 .toggleStyle(.switch)
