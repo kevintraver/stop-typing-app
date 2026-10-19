@@ -66,7 +66,7 @@ private struct GeneralSettings: View {
             Section("Notifications & Focus") {
                 Toggle(isOn: $model.sendsNotifications) {
                     Text("Also send to Notification Center")
-                    Text("Only the first nudge each time, never the follow-ups.")
+                    Text("Each nudge also appears as a notification, so you can find it later.")
                 }
                 if model.notificationsDenied {
                     LabeledContent("Notifications are turned off for Stop Typing App.") {

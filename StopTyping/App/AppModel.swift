@@ -171,20 +171,22 @@ final class AppModel {
 
     private func present(_ nudge: Nudge) {
         switch nudge {
-        case .gentle:
-            if preferences.showsOnScreenNudge { hud.show(nudge) }
-            // Notification Center gets one alert per cycle, never the escalations.
-            if preferences.sendsNotifications { notifier.post(nudge) }
-        case .firm:
-            if preferences.showsOnScreenNudge { hud.show(nudge) }
+        case .gentle, .firm:
+            showNudge(nudge)
         case .stop:
             if preferences.skipsStopInFullScreen && FrontmostWindow.isFullScreen {
                 log.notice("Full screen: showing the on-screen nudge instead of the stop window")
-                if preferences.showsOnScreenNudge { hud.show(.firm) }
+                showNudge(.firm)
             } else {
+                // The stop window already demands attention, so it isn't also sent to Notification Center.
                 showStopWindow()
             }
         }
+    }
+
+    private func showNudge(_ nudge: Nudge) {
+        if preferences.showsOnScreenNudge { hud.show(nudge) }
+        if preferences.sendsNotifications { notifier.post(nudge) }
     }
 
     private func showStopWindow() {

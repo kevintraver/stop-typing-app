@@ -9,7 +9,7 @@ It watches for bursts of typing that read like sentences (several words, mostly 
 - **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks, 5 different letters and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
 - **Quiet by default.** After a nudge, new bursts wait 2 minutes before the next gentle nudge. A 5 second pause (2.5 s for very short bursts) or Escape ends a burst. All of this is adjustable in Settings → Detection.
 - **On-screen nudge** that never takes focus. Drag it anywhere; it remembers the spot. It appears on the screen you're typing on.
-- **Notification Center (optional)** gets the first nudge of each round, never the follow-ups.
+- **Notification Center (optional)** gets every nudge too, so you can find them later. The stop window isn't sent there.
 - **Stop window (opt-in).** Replaces the firm nudge: keep typing after the first nudge and, once the "time to switch to dictation" (30 s by default) has passed, a centered window takes focus until you click Got It, Snooze 15 Minutes or Ignore <App>. Its buttons have no keyboard shortcuts, so typing can't dismiss it. After Got It it stays quiet for a full "wait between nudges", then starts over. In full-screen apps it shows the on-screen nudge instead (adjustable).
 - **Quiet during Focus.** No nudges at all while Do Not Disturb or another Focus is on (adjustable).
 - **Per-app exclusions** for terminals, editors and games, with a one-click toggle for the last app you used.
