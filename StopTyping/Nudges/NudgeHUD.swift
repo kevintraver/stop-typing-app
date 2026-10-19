@@ -23,7 +23,7 @@ extension Nudge {
         switch self {
         case .gentle: "mic.fill"
         case .firm: "hand.raised.fill"
-        case .stop: "exclamationmark.octagon.fill"
+        case .stop: "hand.raised.fill"
         }
     }
 }
