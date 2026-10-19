@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import StopTypingCore
 
@@ -221,11 +222,12 @@ struct TypingDetectorTests {
         #expect(nudges == [.gentle])
     }
 
-    @Test func keyCountsKeepOnlyCoarseLetterBuckets() {
-        // a (0x61) and q (0x71) share a bucket, so the mask can't say which of them was typed.
-        #expect(KeyCounts("a").letterBuckets == KeyCounts("q").letterBuckets)
-        #expect(KeyCounts("A").letterBuckets == KeyCounts("a").letterBuckets)
-        #expect(KeyCounts("jjkkhhll").letterBuckets.nonzeroBitCount == 4)
+    @Test func keyCountsCantTellLettersApart() {
+        // Every letter, in any script or case, reduces to the same counts.
+        let letters = ["a", "q", "Z", "é", "ж", "字"].map(KeyCounts.init)
+        #expect(Set(letters.map(\.letters)) == [1])
+        #expect(letters.allSatisfy { $0 == KeyCounts("x") })
+        #expect(KeyCounts("hello") == KeyCounts("world"))
     }
 
     @Test func keyCountsClassifyWithoutKeepingText() {
@@ -234,5 +236,14 @@ struct TypingDetectorTests {
         #expect(counts.wordBreaks == 2)
         #expect(counts.others == 3)
         #expect(KeyCounts("\u{F700}=+").total == 0) // an arrow key and symbols don't count
+    }
+
+    @Test func savedSettingsFromOlderVersionsStillDecode() throws {
+        // 1.0.0 saved a `minimumDistinctLetters` key that no longer exists; it must be ignored, not
+        // make the whole configuration fall back to defaults.
+        let saved = #"{"sentenceLength":30,"paragraphLength":90,"sustainedTyping":60,"burstGap":5,"shortBurstGap":2.5,"shortBurstLength":10,"cooldown":60,"escalationInterval":30,"stopDelay":30,"minimumWordBreaks":2,"minimumDistinctLetters":5,"minimumLetterRatio":0.6}"#
+        let configuration = try JSONDecoder().decode(DetectorConfiguration.self, from: Data(saved.utf8))
+        #expect(configuration.sentenceLength == 30)
+        #expect(configuration.cooldown == 60)
     }
 }

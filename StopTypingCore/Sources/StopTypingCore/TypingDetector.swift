@@ -19,12 +19,10 @@ public struct DetectorConfiguration: Equatable, Sendable, Codable {
     /// With the stop window on: how long after a gentle nudge continued typing brings the stop window.
     public var stopDelay: TimeInterval = 30
 
-    // A burst reads like prose when it has word breaks, a variety of letters, and is mostly letters.
-    // This keeps Vim motions (`jjjj`), held keys, URLs and symbol-heavy code from counting.
+    // A burst reads like prose when it has word breaks and is mostly letters. That keeps Vim motions
+    // (`jjkk`), URLs and symbol-heavy code from counting; held keys never arrive (auto-repeat is dropped
+    // at the tap). Which letters were typed is never known, so there's deliberately no variety check.
     public var minimumWordBreaks = 2
-    /// How many of `KeyCounts`' 16 letter buckets a burst has to touch. The name predates the
-    /// buckets and is kept so saved settings still decode.
-    public var minimumDistinctLetters = 5
     public var minimumLetterRatio = 0.6
 
     public init() {}
@@ -131,7 +129,6 @@ private struct Burst: Sendable {
     var length = 0
     var letters = 0
     var wordBreaks = 0
-    var letterBuckets: UInt16 = 0
     var countedAsProse = false
     var wasNudged = false
 
@@ -146,7 +143,6 @@ private struct Burst: Sendable {
         length += counts.total
         letters += counts.letters
         wordBreaks += counts.wordBreaks
-        letterBuckets |= counts.letterBuckets
         lastKey = time
         return counts.total
     }
@@ -160,7 +156,6 @@ private struct Burst: Sendable {
     func isProse(_ configuration: DetectorConfiguration) -> Bool {
         length >= configuration.sentenceLength
             && wordBreaks >= configuration.minimumWordBreaks
-            && letterBuckets.nonzeroBitCount >= configuration.minimumDistinctLetters
             && Double(letters) / Double(length) >= configuration.minimumLetterRatio
     }
 
