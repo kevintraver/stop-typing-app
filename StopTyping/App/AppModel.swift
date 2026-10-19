@@ -27,6 +27,7 @@ final class AppModel {
 
     @ObservationIgnored private var detector = TypingDetector()
     @ObservationIgnored private var listening: Task<Void, Never>?
+    @ObservationIgnored private let tapGate = TapGate()
     @ObservationIgnored private var permissionPolling: Task<Void, Never>?
     @ObservationIgnored private var snoozeExpiry: Task<Void, Never>?
     @ObservationIgnored private let hud: NudgeHUD
@@ -149,11 +150,13 @@ final class AppModel {
         preferences.snoozedUntil = until
         detector.reset()
         scheduleSnoozeExpiry(at: until)
+        updateTapGate()
     }
 
     func resume() {
         snoozeExpiry?.cancel()
         preferences.snoozedUntil = nil
+        updateTapGate()
     }
 
     private func scheduleSnoozeExpiry(at until: Date) {
@@ -162,6 +165,7 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             guard !Task.isCancelled else { return }
             preferences.snoozedUntil = nil
+            updateTapGate()
         }
     }
 
@@ -178,6 +182,7 @@ final class AppModel {
         } else {
             preferences.excludedApps.removeAll { $0 == bundleID }
         }
+        updateTapGate()
     }
 
     private func trackFrontmostApp() {
@@ -194,6 +199,7 @@ final class AppModel {
     }
 
     private func noteActivated(bundleID: String?) {
+        updateTapGate()
         guard let bundleID, bundleID != Bundle.main.bundleIdentifier else { return }
         recentApp = AppInfo(bundleID: bundleID)
     }
@@ -208,7 +214,9 @@ final class AppModel {
 
     func preview(_ nudge: Nudge) {
         switch nudge {
-        case .stop: stopWindow.show(ignoring: nil) { _ in }
+        case .stop:
+            stopWindow.show(ignoring: nil) { [weak self] _ in self?.updateTapGate() }
+            updateTapGate()
         case .gentle, .firm: hud.show(nudge)
         }
     }
@@ -246,7 +254,17 @@ final class AppModel {
                 if let app { setExcluded(true, bundleID: app.bundleID) }
                 detector.acknowledgeStop(at: ProcessInfo.processInfo.systemUptime)
             }
+            updateTapGate()
         }
+        updateTapGate()
+    }
+
+    /// Closes the tap's gate whenever keys shouldn't count, so they aren't even read: while snoozed,
+    /// while an ignored app is in front, and while the stop window (which takes the keys) is up.
+    private func updateTapGate() {
+        let isSnoozed = preferences.snoozedUntil.map { $0 > .now } ?? false
+        let inIgnoredApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier.map(isExcluded) ?? false
+        tapGate.set(closed: isSnoozed || inIgnoredApp || stopWindow.isShowing)
     }
 
     // MARK: Listening
@@ -267,7 +285,8 @@ final class AppModel {
         guard listening == nil else { return }
 
         do throws(KeyboardTapError) {
-            let keystrokes = try KeyboardTap.keystrokes()
+            updateTapGate()
+            let keystrokes = try KeyboardTap.keystrokes(gate: tapGate)
             tapState = .listening
             listening = Task {
                 for await keystroke in keystrokes { handle(keystroke) }

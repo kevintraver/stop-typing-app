@@ -2,11 +2,24 @@ import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 import StopTypingCore
+import Synchronization
 
 struct TimedKeystroke: Sendable {
     var keystroke: Keystroke
     /// Seconds since boot; monotonic, unaffected by clock changes.
     var time: TimeInterval
+}
+
+/// Lets the app stop the tap from reading keys at all, without tearing it down: while snoozed, in an
+/// ignored app, or while the stop window is up. The tap checks it before a key's characters are read.
+final class TapGate: Sendable {
+    private let closed = Atomic(false)
+
+    var isClosed: Bool { closed.load(ordering: .relaxed) }
+
+    func set(closed: Bool) {
+        self.closed.store(closed, ordering: .relaxed)
+    }
 }
 
 enum KeyboardTapError: Error {
@@ -28,8 +41,9 @@ enum KeyboardTap {
 
     static let privacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
 
-    /// Starts the tap. It stops when the stream's consumer goes away.
-    static func keystrokes() throws(KeyboardTapError) -> AsyncStream<TimedKeystroke> {
+    /// Starts the tap. It stops when the stream's consumer goes away. While `gate` is closed, keys
+    /// are ignored before anything about them is read.
+    static func keystrokes(gate: TapGate) throws(KeyboardTapError) -> AsyncStream<TimedKeystroke> {
         // A tap created before Input Monitoring is granted never receives keys, even after the grant,
         // so wait for the grant rather than create one that would stay deaf.
         guard hasPermission else { throw .permissionDenied }
@@ -38,7 +52,7 @@ enum KeyboardTap {
             of: TimedKeystroke.self,
             bufferingPolicy: .bufferingNewest(256)
         )
-        let context = TapContext(continuation: continuation)
+        let context = TapContext(continuation: continuation, gate: gate)
         let userInfo = Unmanaged.passRetained(context).toOpaque()
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -72,12 +86,14 @@ enum KeyboardTap {
 /// `port` is set before the thread starts and `runLoop` before `started` is signalled, so later reads are safe.
 private final class TapContext: @unchecked Sendable {
     let continuation: AsyncStream<TimedKeystroke>.Continuation
+    let gate: TapGate
     let started = DispatchSemaphore(value: 0)
     var port: CFMachPort?
     private var runLoop: CFRunLoop?
 
-    init(continuation: AsyncStream<TimedKeystroke>.Continuation) {
+    init(continuation: AsyncStream<TimedKeystroke>.Continuation, gate: TapGate) {
         self.continuation = continuation
+        self.gate = gate
     }
 
     func run() {
@@ -104,7 +120,7 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
     switch type {
     case .tapDisabledByTimeout, .tapDisabledByUserInput:
         if let port = context.port { CGEvent.tapEnable(tap: port, enable: true) }
-    case .keyDown:
+    case .keyDown where !context.gate.isClosed:
         if let keystroke = Keystroke(event) {
             context.continuation.yield(TimedKeystroke(keystroke: keystroke, time: ProcessInfo.processInfo.systemUptime))
         }
