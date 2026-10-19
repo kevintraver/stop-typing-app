@@ -103,6 +103,8 @@ final class AppModel {
     }
 
     func start() {
+        // Only today's counts are kept: a previous day's are cleared rather than left until the next prose.
+        preferences.stats = preferences.stats.on(.now)
         if let until = preferences.snoozedUntil { scheduleSnoozeExpiry(at: until) }
         trackFrontmostApp()
         refreshPermissionOnActivation()
