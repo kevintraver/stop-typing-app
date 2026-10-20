@@ -44,12 +44,31 @@ struct TypingDetectorTests {
     @Test(arguments: [
         String(repeating: "j", count: 60),              // Vim motions / held key
         String(repeating: "jjkkhhll", count: 8),         // Vim navigation
+        "jjjjjjkkkkwwwdd:w\rjjjjjkkkkkp:w\r",            // Vim navigation with saves
+        "jjjjjjjjjjkkkkkkkkk jjjjjjjjjjjj kkkkkkkk",      // Vim navigation with the odd space
         "https://example.com/some/long/path/to/a/page",  // no word breaks
         "let x = foo(bar, 1); let y = baz(2, 3); z(4)",  // symbol- and digit-heavy code
     ])
     func nonProseNeverNudges(text: String) {
         var detector = TypingDetector()
         #expect(type(text, into: &detector).nudges.isEmpty)
+    }
+
+    @Test(arguments: [
+        "Absolutely wonderful performance yesterday evening",
+        "Die Geschwindigkeitsbegrenzung gilt auch nachts",
+    ])
+    func proseWithLongWordsStillNudges(text: String) {
+        var detector = TypingDetector()
+        #expect(type(text, into: &detector).nudges.map(\.0) == [.gentle])
+    }
+
+    @Test func wordBreaksMustKeepUpWithTheBurst() {
+        let configuration = DetectorConfiguration()
+        #expect(configuration.readsAsProse(length: 25, letters: 22, wordBreaks: 3))
+        #expect(!configuration.readsAsProse(length: 25, letters: 23, wordBreaks: 2))
+        #expect(configuration.readsAsProse(length: 36, letters: 33, wordBreaks: 3))
+        #expect(!configuration.readsAsProse(length: 37, letters: 34, wordBreaks: 3))
     }
 
     @Test func shortcutsAreIgnoredAndDoNotBreakTheBurst() {
@@ -241,11 +260,21 @@ struct TypingDetectorTests {
     }
 
     @Test func savedSettingsFromOlderVersionsStillDecode() throws {
-        // 1.0.0 saved a `minimumDistinctLetters` key that no longer exists; it must be ignored, not
-        // make the whole configuration fall back to defaults.
+        // 1.0.0 saved a `minimumDistinctLetters` key that no longer exists, and nothing before 1.0.5
+        // saved `charactersPerWordBreak`. Unknown keys are ignored and missing ones take their default;
+        // neither makes the whole configuration fall back to defaults.
         let saved = #"{"sentenceLength":30,"paragraphLength":90,"sustainedTyping":60,"burstGap":5,"shortBurstGap":2.5,"shortBurstLength":10,"cooldown":60,"escalationInterval":30,"stopDelay":30,"minimumWordBreaks":2,"minimumDistinctLetters":5,"minimumLetterRatio":0.6}"#
         let configuration = try JSONDecoder().decode(DetectorConfiguration.self, from: Data(saved.utf8))
         #expect(configuration.sentenceLength == 30)
         #expect(configuration.cooldown == 60)
+        #expect(configuration.charactersPerWordBreak == DetectorConfiguration().charactersPerWordBreak)
+    }
+
+    @Test func settingsSurviveARoundTrip() throws {
+        var configuration = DetectorConfiguration()
+        configuration.charactersPerWordBreak = 9
+        configuration.minimumLetterRatio = 0.7
+        let data = try JSONEncoder().encode(configuration)
+        #expect(try JSONDecoder().decode(DetectorConfiguration.self, from: data) == configuration)
     }
 }

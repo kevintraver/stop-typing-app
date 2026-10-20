@@ -19,13 +19,43 @@ public struct DetectorConfiguration: Equatable, Sendable, Codable {
     /// With the stop window on: how long after a gentle nudge continued typing brings the stop window.
     public var stopDelay: TimeInterval = 30
 
-    // A burst reads like prose when it has word breaks and is mostly letters. That keeps Vim motions
-    // (`jjkk`), URLs and symbol-heavy code from counting; held keys never arrive (auto-repeat is dropped
-    // at the tap). Which letters were typed is never known, so there's deliberately no variety check.
+    // A burst reads like prose when it has word breaks in proportion to its length and is mostly
+    // letters. That keeps Vim motions (`jjkk`, even with the odd `:w⏎` or space), URLs and symbol-heavy
+    // code from counting; held keys never arrive (auto-repeat is dropped at the tap). Which letters were
+    // typed is never known, so there's deliberately no variety check.
     public var minimumWordBreaks = 2
+    /// At least one word break per this many characters. Prose has one every 5 to 8, so 12 leaves room
+    /// for long words while a burst of navigation keys with a stray break or two never qualifies.
+    public var charactersPerWordBreak = 12
     public var minimumLetterRatio = 0.6
 
     public init() {}
+
+    /// Settings saved by an older version lack the keys added since, and must keep their other values.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = DetectorConfiguration()
+        sentenceLength = try container.decodeIfPresent(Int.self, forKey: .sentenceLength) ?? defaults.sentenceLength
+        paragraphLength = try container.decodeIfPresent(Int.self, forKey: .paragraphLength) ?? defaults.paragraphLength
+        sustainedTyping = try container.decodeIfPresent(TimeInterval.self, forKey: .sustainedTyping) ?? defaults.sustainedTyping
+        burstGap = try container.decodeIfPresent(TimeInterval.self, forKey: .burstGap) ?? defaults.burstGap
+        shortBurstGap = try container.decodeIfPresent(TimeInterval.self, forKey: .shortBurstGap) ?? defaults.shortBurstGap
+        shortBurstLength = try container.decodeIfPresent(Int.self, forKey: .shortBurstLength) ?? defaults.shortBurstLength
+        cooldown = try container.decodeIfPresent(TimeInterval.self, forKey: .cooldown) ?? defaults.cooldown
+        escalationInterval = try container.decodeIfPresent(TimeInterval.self, forKey: .escalationInterval) ?? defaults.escalationInterval
+        stopDelay = try container.decodeIfPresent(TimeInterval.self, forKey: .stopDelay) ?? defaults.stopDelay
+        minimumWordBreaks = try container.decodeIfPresent(Int.self, forKey: .minimumWordBreaks) ?? defaults.minimumWordBreaks
+        charactersPerWordBreak = try container.decodeIfPresent(Int.self, forKey: .charactersPerWordBreak) ?? defaults.charactersPerWordBreak
+        minimumLetterRatio = try container.decodeIfPresent(Double.self, forKey: .minimumLetterRatio) ?? defaults.minimumLetterRatio
+    }
+
+    /// Whether a burst with these counts reads like prose. Letters divided by length is the letter ratio.
+    public func readsAsProse(length: Int, letters: Int, wordBreaks: Int) -> Bool {
+        length >= sentenceLength
+            && wordBreaks >= minimumWordBreaks
+            && wordBreaks * charactersPerWordBreak >= length
+            && Double(letters) / Double(length) >= minimumLetterRatio
+    }
 }
 
 /// Decides when continuous typing looks like prose that would be faster to dictate.
@@ -154,9 +184,7 @@ private struct Burst: Sendable {
     }
 
     func isProse(_ configuration: DetectorConfiguration) -> Bool {
-        length >= configuration.sentenceLength
-            && wordBreaks >= configuration.minimumWordBreaks
-            && Double(letters) / Double(length) >= configuration.minimumLetterRatio
+        configuration.readsAsProse(length: length, letters: letters, wordBreaks: wordBreaks)
     }
 
     func isLong(at time: TimeInterval, _ configuration: DetectorConfiguration) -> Bool {

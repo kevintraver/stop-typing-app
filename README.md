@@ -6,7 +6,7 @@ It watches for bursts of typing that read like sentences (several words, mostly 
 
 ## Features
 
-- **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
+- **Prose detection.** A burst is the typing between pauses. It reads like prose when it has at least 2 word breaks, at least one word break per 12 characters, and is at least 60% letters. The first nudge ("You're typing a lot. Use dictation instead.") comes at 25 characters of prose; keep going past 80 characters or a minute and a firm "Still typing?" follows, at most every 30 seconds.
 - **Quiet by default.** After a nudge, new bursts wait 2 minutes before the next gentle nudge. A 5 second pause (2.5 s for very short bursts) or Escape ends a burst. All of this is adjustable in Settings → Detection.
 - **On-screen nudge** that never takes focus. Drag it anywhere; it remembers the spot. It appears on the screen you're typing on.
 - **Notification Center (optional)** gets every nudge too, so you can find them later. The stop window isn't sent there.
