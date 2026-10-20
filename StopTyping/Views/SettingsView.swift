@@ -433,6 +433,7 @@ private struct TryItSettings: View {
             }
 
             Section("What the Detector Sees") {
+                NudgeMeter(meter: meter(detection))
                 if let reason = reasonNotCounting {
                     ReadoutRow("Not counting", value: reason)
                 }
@@ -442,8 +443,10 @@ private struct TryItSettings: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { isEditing = true }
+        .defaultFocus($isEditing, true)
         .task {
+            // Focus lands once the window is up, which onAppear can be too early for.
+            isEditing = true
             // Pauses, cooldowns and countdowns move without any key arriving.
             while !Task.isCancelled {
                 now = ProcessInfo.processInfo.systemUptime
@@ -488,7 +491,8 @@ private struct TryItSettings: View {
             return String(localized: "Yes")
         }
         if burst.length < detection.sentenceLength {
-            return String(localized: "Not yet: \(Self.characters(detection.sentenceLength - burst.length)) more")
+            let left = detection.sentenceLength - burst.length
+            return left == 1 ? String(localized: "Not yet: 1 more character") : String(localized: "Not yet: \(left) more characters")
         }
         if burst.wordBreaks < detection.minimumWordBreaks || burst.wordBreaks * detection.charactersPerWordBreak < burst.length {
             return String(localized: "No: too few word breaks, needs 1 per \(detection.charactersPerWordBreak) characters")
@@ -528,6 +532,66 @@ private struct TryItSettings: View {
         return "\(shown) \(next) \(conditions.joined(separator: ", "))"
     }
 
+    /// How close the burst is to the next nudge: the characters still to type, with the other
+    /// conditions as checks. Before the gentle nudge that's the sentence length; after it, the paragraph
+    /// length (or the sustained-typing time) and the time gate that holds the firm nudge or stop window.
+    private func meter(_ detection: DetectorConfiguration) -> Meter {
+        let burst = activeBurst
+        let length = burst?.length ?? 0
+        let usesStopWindow = model.preferences.stopsWhenIgnored
+
+        if let burst, burst.wasNudged, let last = model.lastNudge, last.kind != .stop {
+            let since = now - last.time
+            let typing = now - burst.start
+            let gate = (usesStopWindow ? detection.stopDelay : detection.escalationInterval) - since
+            let isLong = length >= detection.paragraphLength || typing >= detection.sustainedTyping
+            let title = usesStopWindow ? String(localized: "Stop window")
+                : last.kind == .firm ? String(localized: "Firm nudge again") : String(localized: "Firm nudge")
+            let trailing = !isLong ? String(localized: "\(detection.paragraphLength - length) to go")
+                : gate >= 1 ? String(localized: "in \(Self.seconds(gate))") : String(localized: "With the next key")
+            return Meter(
+                title: title,
+                value: isLong ? 1 : Double(length) / Double(detection.paragraphLength),
+                trailing: trailing,
+                caption: length >= detection.paragraphLength
+                    ? String(localized: "\(length) characters, past \(detection.paragraphLength)")
+                    : String(localized: "\(length) of \(detection.paragraphLength) characters"),
+                checks: [
+                    Check(
+                        label: String(localized: "or \(Self.seconds(detection.sustainedTyping)) of typing (\(Self.seconds(typing)))"),
+                        isMet: typing >= detection.sustainedTyping
+                    ),
+                    Check(
+                        label: String(localized: "\(Self.seconds(usesStopWindow ? detection.stopDelay : detection.escalationInterval)) after the nudge"),
+                        isMet: gate < 1
+                    ),
+                ]
+            )
+        }
+
+        let toGo = max(detection.sentenceLength - length, 0)
+        let hasWordBreaks = burst.map {
+            $0.wordBreaks >= detection.minimumWordBreaks && $0.wordBreaks * detection.charactersPerWordBreak >= $0.length
+        } ?? false
+        let isMostlyLetters = burst.map { Double($0.letters) / Double($0.length) >= detection.minimumLetterRatio } ?? false
+        var trailing = toGo > 0 ? String(localized: "\(toGo) to go") : String(localized: "Not prose yet")
+        if toGo == 0 && hasWordBreaks && isMostlyLetters {
+            // Reads as prose but hasn't been nudged: a cooldown, a Focus or the stop window's quiet spell.
+            let left = model.lastNudge.map { detection.cooldown - (now - $0.time) } ?? 0
+            trailing = left >= 1 ? String(localized: "in \(Self.seconds(left))") : String(localized: "Ready")
+        }
+        return Meter(
+            title: String(localized: "Gentle nudge"),
+            value: Double(min(length, detection.sentenceLength)) / Double(detection.sentenceLength),
+            trailing: trailing,
+            caption: String(localized: "\(length) of \(detection.sentenceLength) characters"),
+            checks: [
+                Check(label: String(localized: "Word breaks"), isMet: hasWordBreaks),
+                Check(label: String(localized: "Mostly letters"), isMet: isMostlyLetters),
+            ]
+        )
+    }
+
     private static func characters(_ count: Int) -> String {
         count == 1 ? String(localized: "1 character") : String(localized: "\(count) characters")
     }
@@ -542,6 +606,66 @@ private struct TryItSettings: View {
             width: .narrow,
             fractionalPart: fraction ? .show(length: 1) : .hide
         ))
+    }
+}
+
+/// How close the burst is to the next nudge, for the Try It tab.
+private struct Meter {
+    var title: String
+    /// 0 to 1 along the bar.
+    var value: Double
+    var trailing: String
+    var caption: String
+    var checks: [Check]
+}
+
+private struct Check: Identifiable {
+    var label: String
+    var isMet: Bool
+    var id: String { label }
+}
+
+private struct NudgeMeter: View {
+    let meter: Meter
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(meter.title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(meter.trailing)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            // Drawn by hand: a ProgressView ignores its tint in a non-key window and would read as disabled.
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.quaternary)
+                    Capsule()
+                        .fill(meter.value >= 1 ? Color.green : Color.accentColor)
+                        .frame(width: geometry.size.width * min(max(meter.value, 0), 1))
+                }
+            }
+            .frame(height: 6)
+            .animation(.easeOut(duration: 0.15), value: meter.value)
+            .accessibilityElement()
+            .accessibilityLabel(Text(meter.title))
+            .accessibilityValue(meter.trailing)
+            Text(meter.caption)
+                .monospacedDigit()
+            HStack(spacing: 14) {
+                ForEach(meter.checks) { check in
+                    Label(check.label, systemImage: check.isMet ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(check.isMet ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+                        .monospacedDigit()
+                }
+            }
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .padding(.vertical, 4)
     }
 }
 
