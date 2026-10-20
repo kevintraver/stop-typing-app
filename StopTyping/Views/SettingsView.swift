@@ -204,6 +204,7 @@ private struct LaunchAtLoginToggle: View {
 
 private struct DetectionSettings: View {
     @Environment(AppModel.self) private var model
+    @State private var showsAdvanced = false
 
     var body: some View {
         @Bindable var preferences = model.preferences
@@ -251,6 +252,51 @@ private struct DetectionSettings: View {
                 Text(preferences.stopsWhenIgnored
                      ? "After a nudge, the stop window appears once you've typed that much and the time to switch has passed. Only typing that reads like prose counts; shortcuts, held keys, Vim motions and code are ignored, and Escape ends a burst."
                      : "Only typing that reads like prose counts: several words, mostly letters. Shortcuts, held keys, Vim motions and code-like text are ignored, and Escape ends a burst.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
+                    SliderRow(
+                        "Letters",
+                        value: "At least \(detection.minimumLetterRatio.formatted(.percent.precision(.fractionLength(0)))) of characters",
+                        amount: $preferences.detection.minimumLetterRatio.hundredths,
+                        in: 0.4...0.9,
+                        step: 0.05
+                    )
+                    SliderRow(
+                        "Word breaks",
+                        value: "At least 1 per \(detection.charactersPerWordBreak) characters",
+                        amount: $preferences.detection.charactersPerWordBreak.asDouble,
+                        in: 6...24,
+                        step: 1
+                    )
+                    SliderRow(
+                        "Short bursts end after",
+                        value: "\(Self.format(detection.shortBurstGap)) when under \(detection.shortBurstLength) characters",
+                        amount: $preferences.detection.shortBurstGap,
+                        in: 1...5,
+                        step: 0.5
+                    )
+                    SliderRow(
+                        preferences.stopsWhenIgnored ? "Stop window also after" : "Nudge firmly also after",
+                        value: "\(Self.format(detection.sustainedTyping)) of typing",
+                        amount: $preferences.detection.sustainedTyping,
+                        in: 15...300,
+                        step: 15
+                    )
+                    if !preferences.stopsWhenIgnored {
+                        SliderRow(
+                            "Firm nudges at most every",
+                            value: Self.format(detection.escalationInterval),
+                            amount: $preferences.detection.escalationInterval,
+                            in: 10...120,
+                            step: 5
+                        )
+                    }
+                }
+            } footer: {
+                Text("How typing is told from prose. A burst needs that share of letters and that many word breaks before it counts.")
                     .foregroundStyle(.secondary)
             }
 
@@ -316,6 +362,17 @@ private extension Binding where Value == Double {
                 return Double(nearest ?? 0)
             },
             set: { wrappedValue = stops[Int($0.rounded())] }
+        )
+    }
+}
+
+private extension Binding where Value == Double {
+    /// Rounds what the slider sets to two decimals, so a step of 0.05 lands on 0.6 rather than 0.6000000000000001
+    /// and Restore Defaults can tell the value is already the default.
+    var hundredths: Binding<Double> {
+        Binding<Double>(
+            get: { wrappedValue },
+            set: { wrappedValue = ($0 * 100).rounded() / 100 }
         )
     }
 }
