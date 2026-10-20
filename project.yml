@@ -18,8 +18,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     # The single source of the app's version: Info.plist and scripts/release.sh both read these.
-    MARKETING_VERSION: "1.0.5"
-    CURRENT_PROJECT_VERSION: "6"
+    MARKETING_VERSION: "1.0.6"
+    CURRENT_PROJECT_VERSION: "7"
 
 targets:
   StopTypingPrivacyTests:
