@@ -257,7 +257,7 @@ private struct DetectionSettings: View {
             }
 
             Section {
-                DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
+                DisclosureGroup(isExpanded: $showsAdvanced) {
                     SliderRow(
                         "Letters",
                         value: "At least \(detection.minimumLetterRatio.formatted(.percent.precision(.fractionLength(0)))) of characters",
@@ -265,6 +265,8 @@ private struct DetectionSettings: View {
                         in: 0.4...0.9,
                         step: 0.05
                     )
+                    // The rows would otherwise sit flush under the Advanced label.
+                    .padding(.top, 10)
                     SliderRow(
                         "Word breaks",
                         value: "At least 1 per \(detection.charactersPerWordBreak) characters",
@@ -295,6 +297,16 @@ private struct DetectionSettings: View {
                             step: 5
                         )
                     }
+                } label: {
+                    // On macOS only the chevron toggles a disclosure group; the whole row should.
+                    Button {
+                        withAnimation { showsAdvanced.toggle() }
+                    } label: {
+                        Text("Advanced")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
                 }
             } footer: {
                 Text("How typing is told from prose. A burst needs that share of letters and that many word breaks before it counts.")
