@@ -16,8 +16,8 @@ public enum Keystroke: Equatable, Sendable {
 public struct KeyCounts: Equatable, Sendable {
     public private(set) var letters = 0
     public private(set) var wordBreaks = 0
-    /// Digits and punctuation: they add to a burst's length but not to how much it reads like prose.
-    /// Symbols, arrows, Delete and function keys aren't counted at all.
+    /// Digits, punctuation and symbols such as `=`, `+`, `|` and `<`: they add to a burst's length but
+    /// not to how much it reads like prose. Arrows, Delete and function keys aren't counted at all.
     public private(set) var others = 0
 
     public var total: Int { letters + wordBreaks + others }
@@ -28,7 +28,7 @@ public struct KeyCounts: Equatable, Sendable {
                 letters += 1
             } else if character.isWhitespace {
                 wordBreaks += 1
-            } else if character.isNumber || character.isPunctuation {
+            } else if character.isNumber || character.isPunctuation || character.isSymbol {
                 others += 1
             }
         }

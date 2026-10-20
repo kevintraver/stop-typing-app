@@ -235,7 +235,9 @@ struct TypingDetectorTests {
         #expect(counts.letters == 5)
         #expect(counts.wordBreaks == 2)
         #expect(counts.others == 3)
-        #expect(KeyCounts("\u{F700}=+").total == 0) // an arrow key and symbols don't count
+        // Symbol keys are code's signature characters, so they dilute a burst like punctuation does.
+        #expect(KeyCounts("=+|<>$`~^").others == 9)
+        #expect(KeyCounts("\u{F700}\u{7F}\u{8}").total == 0) // an arrow, Delete and Backspace don't count
     }
 
     @Test func savedSettingsFromOlderVersionsStillDecode() throws {
