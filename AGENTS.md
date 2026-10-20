@@ -5,11 +5,13 @@ Notes for coding agents (and people) working on Stop Typing App. README.md cover
 ## Architecture
 
 - **`StopTypingCore/`** (Swift package, no AppKit): `TypingDetector` decides when typing reads like prose and which nudge to show; `DailyStats` keeps per-day counts. All detection rules live here and are covered by `make test` (Swift Testing). Change behaviour here first, with a test.
+- **Prose rule** (`DetectorConfiguration.readsAsProse`): a burst counts once it is `sentenceLength` long, has at least `minimumWordBreaks` and one word break per `charactersPerWordBreak` characters, and is `minimumLetterRatio` letters. Only counts exist (letters / word breaks / other, where other is digits, punctuation and symbols), so there is no letter-identity signal to add; code in wordy languages and shell commands read as prose, and the ignore list is the tool for those apps. `DetectorConfiguration` decodes key by key with defaults, so adding a setting never discards saved ones.
 - **`StopTyping/Input/KeyboardTap.swift`**: a *listen-only* `CGEventTap` on its own thread, turned into `Keystroke` values (characters are classified, never kept) and delivered as an `AsyncStream`. Listen-only needs Input Monitoring, not Accessibility.
 - **`StopTyping/App/AppModel.swift`**: `@MainActor @Observable`; owns the tap, detector, nudges, snooze, ignore list and permission state. `Preferences` persists settings to `UserDefaults` with `didSet`. `Updater` wraps Sparkle.
 - **Nudge escalation** (decided with the user, see `TypingDetector.nudge(for:at:)`): gentle → firm "Still typing?" by default; gentle → stop window when "Stop me if I keep typing" is on. After Got It the stop window waits a full cooldown, then starts over. In full-screen apps the stop window becomes the on-screen nudge. During a Focus the detector is `isQuiet` (counts prose, never nudges). Notification Center mirrors gentle and firm nudges, never the stop window.
 - **`StopTyping/Nudges/`**: `NudgeHUD` (draggable, click-through margin, remembers its offset), `StopWindow` (focus-stealing panel; buttons deliberately have no keyboard shortcuts), `NotificationNudger`, `FrontmostWindow` (which screen you're typing on, and full-screen detection).
 - **`StopTyping/Onboarding/`**: the first-run permissions checklist, hosted in an AppKit window owned by `AppModel`.
+- **Settings → Try It** (`TryItSettings` in `SettingsView.swift`) reads the real detector: `AppModel.lastCountedKey` is observable and changes per counted key, and the view then reads `currentBurst` and `lastNudge` from the (unobserved) detector. The event tap sees the settings window like any other app, so typing there nudges for real. Its readout mirrors `TypingDetector.nudge(for:at:)`; change both together.
 
 ## Conventions
 
