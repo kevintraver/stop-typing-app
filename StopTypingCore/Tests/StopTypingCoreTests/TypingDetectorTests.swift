@@ -221,6 +221,39 @@ struct TypingDetectorTests {
         #expect(code.prose == 0)
     }
 
+    @Test func summarizesTheCurrentBurst() throws {
+        var detector = TypingDetector()
+        #expect(detector.currentBurst == nil)
+        let result = type("I think we should move the meeting", into: &detector)
+
+        let burst = try #require(detector.currentBurst)
+        #expect(burst.length == 34 && burst.letters == 28 && burst.wordBreaks == 6)
+        #expect(burst.start == 0 && burst.lastKey == result.end)
+        #expect(burst.endsAfterPause == DetectorConfiguration().burstGap)
+        #expect(burst.readsAsProse && burst.wasNudged)
+        #expect(detector.lastNudge?.kind == .gentle)
+
+        _ = detector.register(.escape, at: result.end + 1)
+        #expect(detector.currentBurst == nil)
+    }
+
+    @Test func aShortBurstReportsTheShorterPause() {
+        var detector = TypingDetector()
+        _ = type("I think", into: &detector)
+        #expect(detector.currentBurst?.endsAfterPause == DetectorConfiguration().shortBurstGap)
+    }
+
+    @Test func startingOverForgetsTheCooldown() {
+        var detector = TypingDetector()
+        let first = type(sentence, into: &detector)
+        detector.startOver()
+        let second = type(sentence, into: &detector, from: first.end + 10)
+
+        #expect(first.nudges.map(\.0) == [.gentle])
+        #expect(second.nudges.map(\.0) == [.gentle])
+        #expect(detector.lastNudge?.time == second.nudges[0].1)
+    }
+
     @Test func respectsAConfiguredSentenceLength() {
         var configuration = DetectorConfiguration()
         configuration.sentenceLength = 40

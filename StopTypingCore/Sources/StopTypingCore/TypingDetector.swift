@@ -73,13 +73,46 @@ public struct TypingDetector: Sendable {
         }
     }
 
+    /// The counts of the burst being tracked, so a settings screen can show what the detector sees.
+    public struct BurstSummary: Equatable, Sendable {
+        public var length: Int
+        public var letters: Int
+        public var wordBreaks: Int
+        /// When the burst started and when its last key arrived, in the detector's clock.
+        public var start: TimeInterval
+        public var lastKey: TimeInterval
+        /// A pause this long after `lastKey` ends the burst.
+        public var endsAfterPause: TimeInterval
+        public var readsAsProse: Bool
+        public var wasNudged: Bool
+    }
+
     public var configuration: DetectorConfiguration
     /// Escalate gentle → stop instead of gentle → firm, firm, …
     public var usesStopWindow = false
     /// Keep tracking prose, but never nudge or advance the escalation (e.g. during a Focus).
     public var isQuiet = false
+    /// The last nudge and when it fired; the cooldown counts from here.
+    public private(set) var lastNudge: (kind: Nudge, time: TimeInterval)?
     private var burst: Burst?
-    private var lastNudge: (kind: Nudge, time: TimeInterval)?
+
+    /// The burst as of its last key. Whether a pause has ended it since is up to the caller's clock.
+    public var currentBurst: BurstSummary? {
+        burst.map { burst in
+            BurstSummary(
+                length: burst.length,
+                letters: burst.letters,
+                wordBreaks: burst.wordBreaks,
+                start: burst.start,
+                lastKey: burst.lastKey,
+                endsAfterPause: burst.length < configuration.shortBurstLength
+                    ? min(configuration.shortBurstGap, configuration.burstGap)
+                    : configuration.burstGap,
+                readsAsProse: burst.isProse(configuration),
+                wasNudged: burst.wasNudged
+            )
+        }
+    }
 
     public init(configuration: DetectorConfiguration = DetectorConfiguration()) {
         self.configuration = configuration
@@ -100,6 +133,12 @@ public struct TypingDetector: Sendable {
     /// Forgets the current burst, e.g. after a snooze or when monitoring stops.
     public mutating func reset() {
         burst = nil
+    }
+
+    /// Forgets the burst and the last nudge too, so the next prose is nudged as if the app had just started.
+    public mutating func startOver() {
+        burst = nil
+        lastNudge = nil
     }
 
     /// The user dismissed the stop window: stay quiet for a full cooldown from now, then start over.
