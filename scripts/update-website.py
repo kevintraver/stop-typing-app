@@ -124,7 +124,7 @@ section:target h2 a{{text-decoration:underline;text-underline-offset:4px}}
 <main style="max-width: 720px; margin: 0 auto; padding: clamp(32px, 6vw, 56px) 24px clamp(64px, 10vw, 96px); display: flex; flex-direction: column; gap: 48px">
 <div style="display: flex; flex-direction: column; gap: 14px">
 <h1 style="margin: 0; font-size: clamp(34px, 4.4vw, 54px); line-height: 1.05; font-weight: 650; letter-spacing: -0.035em">What’s new</h1>
-<p style="margin: 0; font-size: 19px; line-height: 1.6; color: #5B5B63">What changed in each release. The app installs updates itself once you turn on automatic checks in Settings, and every version is on <a href="{RELEASES_URL}" {LINK}>GitHub</a>.</p>
+<p style="margin: 0; font-size: 19px; line-height: 1.6; color: #5B5B63">Each release and what changed in it. Turn on automatic update checks in Settings to get new versions as they come out, or download any version from <a href="{RELEASES_URL}" {LINK}>GitHub</a>.</p>
 </div>
 
 {entries}
