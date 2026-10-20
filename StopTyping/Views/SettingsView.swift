@@ -9,6 +9,7 @@ struct SettingsView: View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Detection", systemImage: "text.word.spacing") { DetectionSettings() }
+            Tab("Try It", systemImage: "keyboard") { TryItSettings() }
             Tab("Ignore", systemImage: "eye.slash") { ExcludedAppsSettings() }
         }
         .frame(width: 480, height: 520)
@@ -383,6 +384,186 @@ private extension Binding where Value == Int {
             get: { Double(wrappedValue) },
             set: { wrappedValue = Int($0.rounded()) }
         )
+    }
+}
+
+// MARK: - Try It
+
+/// A place to type and watch the detector count it. The readout is the real detector, fed by the
+/// event tap like any other app, so what happens here is what happens everywhere.
+private struct TryItSettings: View {
+    @Environment(AppModel.self) private var model
+    @State private var text = ""
+    @State private var now = ProcessInfo.processInfo.systemUptime
+    @FocusState private var isEditing: Bool
+
+    var body: some View {
+        // Read so the readout refreshes with every counted key; the time itself comes from `now`.
+        let _ = model.lastCountedKey
+        let detection = model.preferences.detection
+        Form {
+            Section {
+                TextEditor(text: $text)
+                    .font(.body)
+                    .frame(minHeight: 96)
+                    .scrollContentBackground(.hidden)
+                    .autocorrectionDisabled()
+                    .focused($isEditing)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text("Type a sentence or two…")
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            } header: {
+                Text("Type Here")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Nothing typed here is saved. The readout is the real detector, so it also follows typing in other apps.")
+                        .foregroundStyle(.secondary)
+                    SectionActions {
+                        Button("Start Over") {
+                            text = ""
+                            model.startOverTyping()
+                        }
+                    }
+                }
+            }
+
+            Section("What the Detector Sees") {
+                if let reason = reasonNotCounting {
+                    ReadoutRow("Not counting", value: reason)
+                }
+                ReadoutRow("Burst", value: burstText(detection))
+                ReadoutRow("Prose", value: proseText(detection))
+                ReadoutRow("Nudge", value: nudgeText(detection))
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { isEditing = true }
+        .task {
+            // Pauses, cooldowns and countdowns move without any key arriving.
+            while !Task.isCancelled {
+                now = ProcessInfo.processInfo.systemUptime
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
+    private var reasonNotCounting: String? {
+        switch model.status {
+        case .off: return String(localized: "Watch for long typing is off")
+        case .needsPermission: return String(localized: "Needs Input Monitoring")
+        case .unavailable: return String(localized: "Couldn't start listening")
+        case .snoozed: return model.snoozeDescription
+        case .listening: break
+        }
+        if let bundleID = Bundle.main.bundleIdentifier, model.isExcluded(bundleID) {
+            return String(localized: "Stop Typing App is on its own ignore list")
+        }
+        return nil
+    }
+
+    /// The burst, unless a pause has already ended it.
+    private var activeBurst: TypingDetector.BurstSummary? {
+        model.currentBurst.flatMap { now - $0.lastKey < $0.endsAfterPause ? $0 : nil }
+    }
+
+    private func burstText(_ detection: DetectorConfiguration) -> String {
+        guard let burst = model.currentBurst else { return String(localized: "None yet") }
+        guard activeBurst != nil else {
+            return String(localized: "Ended after \(Self.characters(burst.length)). The next key starts a new one.")
+        }
+        let breaks = burst.wordBreaks == 1 ? String(localized: "1 word break") : String(localized: "\(burst.wordBreaks) word breaks")
+        let counts = String(localized: "\(Self.characters(burst.length)), \(breaks), \(Self.percent(burst.letters, of: burst.length)) letters")
+        let idle = now - burst.lastKey
+        return idle >= 1 ? String(localized: "\(counts), pausing \(Self.seconds(idle, fraction: true))") : counts
+    }
+
+    private func proseText(_ detection: DetectorConfiguration) -> String {
+        guard let burst = activeBurst else { return String(localized: "No") }
+        if detection.readsAsProse(length: burst.length, letters: burst.letters, wordBreaks: burst.wordBreaks) {
+            return String(localized: "Yes")
+        }
+        if burst.length < detection.sentenceLength {
+            return String(localized: "Not yet: \(Self.characters(detection.sentenceLength - burst.length)) more")
+        }
+        if burst.wordBreaks < detection.minimumWordBreaks || burst.wordBreaks * detection.charactersPerWordBreak < burst.length {
+            return String(localized: "No: too few word breaks, needs 1 per \(detection.charactersPerWordBreak) characters")
+        }
+        let needed = detection.minimumLetterRatio.formatted(.percent.precision(.fractionLength(0)))
+        return String(localized: "No: only \(Self.percent(burst.letters, of: burst.length)) letters, needs \(needed)")
+    }
+
+    /// What the detector will do next, following the same rules as `TypingDetector.nudge(for:at:)`.
+    private func nudgeText(_ detection: DetectorConfiguration) -> String {
+        if model.preferences.isQuietDuringFocus && model.isInFocus { return String(localized: "None during Focus") }
+        let whenProse = String(localized: "Gentle, once this reads as prose")
+        guard let last = model.lastNudge else { return whenProse }
+        let since = now - last.time
+        // Anything under a second reads as "now": the countdowns show whole seconds.
+        if last.kind == .stop {
+            let left = detection.cooldown - since
+            return left >= 1 ? String(localized: "Quiet for \(Self.seconds(left)) after Got It") : whenProse
+        }
+        guard let burst = activeBurst, burst.wasNudged else {
+            let left = detection.cooldown - since
+            return left >= 1 ? String(localized: "Gentle in \(Self.seconds(left)), once this reads as prose") : whenProse
+        }
+
+        let usesStopWindow = model.preferences.stopsWhenIgnored
+        let shown = last.kind == .gentle ? String(localized: "Gentle shown.") : String(localized: "Firm shown.")
+        let next = usesStopWindow ? String(localized: "Stop window")
+            : last.kind == .firm ? String(localized: "Firm again") : String(localized: "Firm nudge")
+        let gate = (usesStopWindow ? detection.stopDelay : detection.escalationInterval) - since
+        let isLong = burst.length >= detection.paragraphLength || now - burst.start >= detection.sustainedTyping
+        if isLong && gate < 1 { return String(localized: "\(shown) \(next) with the next key") }
+        var conditions: [String] = []
+        if gate >= 1 { conditions.append(String(localized: "in \(Self.seconds(gate))")) }
+        if !isLong {
+            conditions.append(String(localized: "once past \(detection.paragraphLength) characters or \(Self.seconds(detection.sustainedTyping)) of typing"))
+        }
+        return "\(shown) \(next) \(conditions.joined(separator: ", "))"
+    }
+
+    private static func characters(_ count: Int) -> String {
+        count == 1 ? String(localized: "1 character") : String(localized: "\(count) characters")
+    }
+
+    private static func percent(_ part: Int, of whole: Int) -> String {
+        (Double(part) / Double(max(whole, 1))).formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    private static func seconds(_ seconds: TimeInterval, fraction: Bool = false) -> String {
+        Duration.seconds(max(seconds, 0)).formatted(.units(
+            allowed: [.minutes, .seconds],
+            width: .narrow,
+            fractionalPart: fraction ? .show(length: 1) : .hide
+        ))
+    }
+}
+
+/// A readout line: a label with a value that may wrap.
+private struct ReadoutRow: View {
+    let title: LocalizedStringResource
+    let value: String
+
+    init(_ title: LocalizedStringResource, value: String) {
+        self.title = title
+        self.value = value
+    }
+
+    var body: some View {
+        LabeledContent {
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+        } label: {
+            Text(title)
+        }
     }
 }
 

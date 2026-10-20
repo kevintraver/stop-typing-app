@@ -24,6 +24,9 @@ final class AppModel {
     /// The app most recently brought to the front, other than this one. Offered as a quick exclusion.
     private(set) var recentApp: AppInfo?
     private(set) var notificationsDenied = false
+    /// When the detector last counted a key, in `ProcessInfo.systemUptime` seconds. The Try It tab
+    /// watches it and re-reads `currentBurst`; the detector itself changes with every key, so it isn't observed.
+    private(set) var lastCountedKey: TimeInterval?
 
     @ObservationIgnored private var detector = TypingDetector()
     @ObservationIgnored private var listening: Task<Void, Never>?
@@ -206,6 +209,20 @@ final class AppModel {
         recentApp = AppInfo(bundleID: bundleID)
     }
 
+    // MARK: What the detector sees
+
+    var currentBurst: TypingDetector.BurstSummary? { detector.currentBurst }
+
+    var lastNudge: (kind: Nudge, time: TimeInterval)? { detector.lastNudge }
+
+    var isInFocus: Bool { focus.isFocused }
+
+    /// Start Over in the Try It tab: forgets the burst and the cooldown, so the next prose is nudged right away.
+    func startOverTyping() {
+        detector.startOver()
+        lastCountedKey = nil
+    }
+
     // MARK: Nudges
 
     /// Moves the nudge back to its default spot and shows it there, so the reset is visible right away.
@@ -373,6 +390,7 @@ final class AppModel {
         detector.usesStopWindow = preferences.stopsWhenIgnored
         detector.isQuiet = preferences.isQuietDuringFocus && focus.isFocused
         let outcome = detector.register(keystroke.keystroke, at: keystroke.time)
+        lastCountedKey = keystroke.time
         if outcome.newProseCharacters > 0 {
             preferences.stats.recordProse(outcome.newProseCharacters, at: .now)
         }
