@@ -59,7 +59,7 @@ The app runs from `~/Applications`, not `build/`, so `make clean` can't delete i
 
 ```sh
 make release  # dist/: signed, notarized DMG, Sparkle zip and appcast; prints the DMG's SHA-256
-make publish  # also creates the GitHub release and updates the Homebrew cask
+make publish  # also creates the GitHub release, updates the Homebrew cask and renders the website's What's New page
 ```
 
 Without a Developer ID certificate, `make release` still produces a DMG signed with Apple Development and warns loudly; it won't pass Gatekeeper on other Macs, and `make publish` refuses to use it. One-time setup for real releases:
@@ -68,6 +68,9 @@ Without a Developer ID certificate, `make release` still produces a DMG signed w
 2. **Notarization:** `xcrun notarytool store-credentials stop-typing --apple-id <apple-id> --team-id 8EDDZ23NT2` with an app-specific password (or set `NOTARY_KEY_ID`/`NOTARY_ISSUER` for an App Store Connect API key).
 3. **Sparkle key:** after one `make release`, run `build/release/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys`. It stores the private key in your login keychain; back it up with `generate_keys -x <file>`. Losing it means installed copies can never update again.
 4. **Tap:** clone [kevintraver/homebrew-tap](https://github.com/kevintraver/homebrew-tap) to `~/Code/homebrew-tap`. `make publish` writes `Casks/stop-typing-app.rb` there (from `packaging/homebrew/`) and prints the commands to push it.
+5. **Website:** clone [kevintraver/stop-typing-app-website](https://github.com/kevintraver/stop-typing-app-website) to `~/Code/stop-typing-app-website`. `make publish` renders `changelog.html` there from `docs/releases/*.md` and prints the commands to push it.
+
+Release notes are written by hand in `docs/releases/<version>.md` before publishing. The same file becomes the GitHub release's notes, the notes Sparkle shows in its update window, and the release's entry on the website's What's New page.
 
 ## Layout
 

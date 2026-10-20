@@ -12,6 +12,7 @@
 #                    an App Store Connect API key to notarize with instead of the profile
 #                    (NOTARY_KEY defaults to ~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
 #   TAP_DIR          local checkout of the Homebrew tap, for publish (default ~/Code/homebrew-tap)
+#   WEBSITE_DIR      local checkout of the website, for publish (default ~/Code/stop-typing-app-website)
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -43,6 +44,9 @@ DMG="${DIST_DIR}/StopTypingApp-${VERSION}.dmg"
 LATEST_DMG="${DIST_DIR}/StopTypingApp-latest.dmg"
 ZIP="${UPDATES_DIR}/StopTypingApp-${VERSION}.zip"
 APPCAST="${UPDATES_DIR}/appcast.xml"
+# Hand-written notes, shown in Sparkle's update window, on the GitHub release and on the website.
+NOTES_FILE="${REPO_DIR}/docs/releases/${VERSION}.md"
+WEBSITE_URL="https://www.stoptypingapp.com"
 SPARKLE_BIN="${DERIVED_DATA}/SourcePackages/artifacts/sparkle/Sparkle/bin"
 
 warn() {
@@ -237,9 +241,14 @@ cp -f "${DMG}" "${LATEST_DMG}"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${APP_BUNDLE}" "${ZIP}"
 if [[ -n "${SPARKLE_PUBLIC_KEY}" ]]; then
   echo "==> Generating appcast.xml"
+  # generate_appcast embeds a Markdown file named like the archive as the item's release notes.
+  [[ -f "${NOTES_FILE}" ]] && cp "${NOTES_FILE}" "${UPDATES_DIR}/StopTypingApp-${VERSION}.md"
   # Reads the private key from the keychain (macOS may ask to allow it) and signs the zip with it.
   "${SPARKLE_BIN}/generate_appcast" \
     --download-url-prefix "https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/" \
+    --embed-release-notes \
+    --link "${WEBSITE_URL}/" \
+    --full-release-notes-url "${WEBSITE_URL}/changelog.html" \
     -o "${APPCAST}" \
     "${UPDATES_DIR}"
 fi
@@ -264,11 +273,13 @@ fi
 echo "==> Publishing v${VERSION} to ${GITHUB_REPO}"
 # The appcast rides along on every release, so .../releases/latest/download/appcast.xml (the app's
 # SUFeedURL) always serves the newest one. The tag points at the commit that was built, so push it first.
-# Hand-written notes in docs/releases/<version>.md when there are any; otherwise GitHub generates them.
-NOTES_FILE="${REPO_DIR}/docs/releases/${VERSION}.md"
+# The hand-written notes when there are any; otherwise GitHub generates them.
 if [[ -f "${NOTES_FILE}" ]]; then NOTES=(--notes-file "${NOTES_FILE}"); else NOTES=(--generate-notes); fi
 gh release create "v${VERSION}" --repo "${GITHUB_REPO}" --target "$(git rev-parse HEAD)" \
   --title "${APP_NAME} ${VERSION}" "${NOTES[@]}" \
   "${DMG}" "${LATEST_DMG}" "${ZIP}" "${APPCAST}"
 
 "${REPO_DIR}/scripts/update-cask.sh" "${VERSION}" "${SHA256}" ${TAP_DIR:+"${TAP_DIR}"}
+# The release's tag dates its entry on the website's What's New page.
+git fetch --tags -q origin
+"${REPO_DIR}/scripts/update-website.py" "${VERSION}" ${WEBSITE_DIR:+"${WEBSITE_DIR}"}
