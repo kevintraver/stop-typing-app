@@ -228,8 +228,8 @@ private struct DetectionSettings: View {
                 )
                 if preferences.stopsWhenIgnored {
                     SliderRow(
-                        "Time to switch to dictation",
-                        value: Self.format(detection.stopDelay),
+                        "Stop window waits at least",
+                        value: "\(Self.format(detection.stopDelay)) after a nudge",
                         amount: $preferences.detection.stopDelay,
                         in: 15...120,
                         step: 5
@@ -251,7 +251,7 @@ private struct DetectionSettings: View {
                 )
             } footer: {
                 Text(preferences.stopsWhenIgnored
-                     ? "After a nudge, the stop window appears once you've typed that much and the time to switch has passed. Only typing that reads like prose counts; shortcuts, held keys, Vim motions and code are ignored, and Escape ends a burst."
+                     ? "After a nudge, the stop window appears only once you've typed that much and waited that long, which leaves time to switch to dictation. Only typing that reads like prose counts; shortcuts, held keys, Vim motions and code are ignored, and Escape ends a burst."
                      : "Only typing that reads like prose counts: several words, mostly letters. Shortcuts, held keys, Vim motions and code-like text are ignored, and Escape ends a burst.")
                     .foregroundStyle(.secondary)
             }
